@@ -56,7 +56,7 @@ jobs:
           push: true
           provenance: false
           platforms: linux/amd64,linux/arm64
-          tags: snapclient:latest
+          tags: shuricksumy/snapclient:latest
 
   vulnerability-scan:
     runs-on: ubuntu-latest
