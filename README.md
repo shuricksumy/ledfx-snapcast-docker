@@ -20,8 +20,6 @@
       image: shuricksumy/snapcast:latest
       container_name: snapserver
       restart: unless-stopped
-      labels:
-        - "com.centurylinklabs.watchtower.enable=true"
       network_mode: host
       environment:
         - ROLE=server
