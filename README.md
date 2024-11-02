@@ -1,3 +1,5 @@
+# Docker builder for [Snapcast](https://github.com/badaix/snapcast)
+
 # snapclient
 
 ```
