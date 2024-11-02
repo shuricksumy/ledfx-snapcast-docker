@@ -10,7 +10,7 @@
       environment:
         - HOST=192.168.88.111  # Static IP of Snapserver
         - ROLE=client
-        - EXTRA_ARGS=--user snapclient:audio -s BTR3K
+        - EXTRA_ARGS=--user snapclient:audio -s BTR3K --hostID FIIO
 ```
 
 # snapserver
