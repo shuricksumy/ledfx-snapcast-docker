@@ -1,7 +1,7 @@
 # snapclient
 
 ```
- snapclient2:
+ snapclient:
       image: shuricksumy/snapclient:latest
       container_name: snapclient
       restart: always
