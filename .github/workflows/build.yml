@@ -7,7 +7,20 @@ on:
     paths-ignore:
       - '.github/**'
       - '*.md'
-  workflow_dispatch: ~
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Choose action: push-main or release'
+        required: true
+        default: push-main
+        options:
+          - push-main
+          - release
+      tag_name:
+        description: 'Release tag name (required for release)'
+        required: false
 
 jobs:
   build-and-push:
@@ -37,6 +50,19 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Determine Tags
+        id: tags
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "LATEST_TAG=latest" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "RELEASE_TAG=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.action }}" == "push-main" ]]; then
+            echo "LATEST_TAG=latest" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.action }}" == "release" ]]; then
+            echo "RELEASE_TAG=${{ github.event.inputs.tag_name }}" >> $GITHUB_ENV
+          fi
+
       - name: Build and Push Docker Image to GitHub Container Registry
         uses: docker/build-push-action@v5
         with:
@@ -46,7 +72,7 @@ jobs:
           provenance: false
           platforms: linux/amd64,linux/arm64
           tags: |
-            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ env.LATEST_TAG || env.RELEASE_TAG }}
 
       - name: Build and Push Docker Image to Docker Hub
         uses: docker/build-push-action@v5
@@ -56,7 +82,8 @@ jobs:
           push: true
           provenance: false
           platforms: linux/amd64,linux/arm64
-          tags: shuricksumy/snapclient:latest
+          tags: |
+            shuricksumy/snapcast:${{ env.LATEST_TAG || env.RELEASE_TAG }}
 
   vulnerability-scan:
     runs-on: ubuntu-latest
@@ -71,16 +98,29 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Determine Tags
+        id: tags
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "LATEST_TAG=latest" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "RELEASE_TAG=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.action }}" == "push-main" ]]; then
+            echo "LATEST_TAG=latest" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.action }}" == "release" ]]; then
+            echo "RELEASE_TAG=${{ github.event.inputs.tag_name }}" >> $GITHUB_ENV
+          fi
+
       - name: Pull Docker Image from GitHub Packages
         run: |
-          docker pull ghcr.io/${{ github.repository }}:latest
+          docker pull ghcr.io/${{ github.repository }}:${{ env.LATEST_TAG || env.RELEASE_TAG }}
 
       - name: Run Docker Scout Vulnerability Scan
         uses: docker/scout-action@v1
         id: docker-scout-cves
         with:
           command: cves,recommendations
-          image: ghcr.io/${{ github.repository }}:latest
+          image: ghcr.io/${{ github.repository }}:${{ env.LATEST_TAG || env.RELEASE_TAG }}
           sarif-file: sarif.output.json
           summary: true
 
