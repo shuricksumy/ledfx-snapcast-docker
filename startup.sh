@@ -3,6 +3,15 @@
 # Set default ROLE to 'server' if not set
 ROLE=${ROLE:-server}
 
+# Function to keep a command running with restart on crash
+keep_alive() {
+    while true; do
+        "$@"   # Run the command
+        echo "Process $@ crashed with exit code $?. Restarting in 1 second..."
+        sleep 1
+    done
+}
+
 # Execute the appropriate application based on the ROLE variable
 case "$ROLE" in
     server)
@@ -13,17 +22,20 @@ case "$ROLE" in
         ;;
     client)
         echo "Starting in client mode..."
-        exec /usr/bin/snapclient -h $HOST $EXTRA_ARGS
+        exec /usr/bin/snapclient -h "$HOST" $EXTRA_ARGS
         ;;
-    client-ledfx)
+    ledfx)
         echo "Starting in client-ledfx mode..."
-        # Run the snapclient in the background
-        /usr/bin/snapclient -h $HOST $EXTRA_ARGS &
-        # Start ledfx in the foreground
-        cd /ledfx && exec /bin/sh -c '. /ledfx/venv/bin/activate && exec ledfx'
+        echo "Run on host machine 'sudo modprobe snd-aloop'"
+
+        # Start snapclient in a restartable loop
+        keep_alive /usr/bin/snapclient -h "$HOST" --sound alsa --soundcard "Loopback" &
+
+        # Start ledfx in a restartable loop
+        cd /ledfx && keep_alive /bin/sh -c '. /ledfx/venv/bin/activate && exec ledfx'
         ;;
     *)
-        echo "Usage: ROLE={server|client|client-ledfx} [args]"
+        echo "Usage: ROLE={server|client|ledfx} [args]"
         exit 1
         ;;
 esac

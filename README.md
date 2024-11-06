@@ -1,6 +1,6 @@
-# Docker builder for [Snapcast](https://github.com/badaix/snapcast)
+# Docker builder for [Snapcast](https://github.com/badaix/snapcast) and [LedFX](https://github.com/LedFx/LedFx)
 
-# snapclient
+# Snapclient
 
 ```
  snapclient:
@@ -15,27 +15,27 @@
         - EXTRA_ARGS=--user snapclient:audio -s BTR3K --hostID FIIO
 ```
 
-# ledfx + snapclient
+# LedFX
+## Need to run ```sudo modprobe snd-aloop``` to add Loopback device
 
 ```
 services:
-  snapclient:
-    image: test:latest
-    container_name: snapclient
+  snapclient-ledfx:
+    image: shuricksumy/snapcast:latest
+    container_name: snapclient-ledfx
     restart: unless-stopped
     ports:
       - "8888:8888" # ledfx web port
     environment:
       - HOST=192.168.88.111  # Static IP of Snapserver
-      - ROLE=client-ledfx
-      - EXTRA_ARGS=--user snapclient:audio -s BTR3K --hostID FIIO
+      - ROLE=ledfx
     volumes:
       - ./ledfx:/root/.ledfx
     devices:
       - "/dev/snd:/dev/snd"  # Access to host audio devices
 ```
 
-# snapserver
+# Snapserver
 
 ```
     snapserver:
