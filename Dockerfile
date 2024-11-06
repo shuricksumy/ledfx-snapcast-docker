@@ -84,7 +84,7 @@ WORKDIR /
 COPY snapserver.conf /etc/snapserver.conf
 COPY startup.sh startup.sh
 RUN chmod +x /startup.sh
-EXPOSE 1704 1705 1780
+EXPOSE 1704 1705 1780 8888
 ENTRYPOINT [ "/startup.sh" ]
 
 

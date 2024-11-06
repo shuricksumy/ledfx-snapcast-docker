@@ -23,7 +23,8 @@ services:
     image: test:latest
     container_name: snapclient
     restart: unless-stopped
-    network_mode: host
+    ports:
+      - "8888:8888" # ledfx web port
     environment:
       - HOST=192.168.88.111  # Static IP of Snapserver
       - ROLE=client-ledfx
