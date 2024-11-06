@@ -6,15 +6,24 @@ ROLE=${ROLE:-server}
 # Execute the appropriate application based on the ROLE variable
 case "$ROLE" in
     server)
+        echo "Starting in server mode..."
         dbus-daemon --system
         avahi-daemon --no-chroot &
-        /usr/bin/snapserver $EXTRA_ARGS
+        exec /usr/bin/snapserver $EXTRA_ARGS
         ;;
     client)
-        /usr/bin/snapclient -h $HOST $EXTRA_ARGS
+        echo "Starting in client mode..."
+        exec /usr/bin/snapclient -h $HOST $EXTRA_ARGS
+        ;;
+    client-ledfx)
+        echo "Starting in client-ledfx mode..."
+        # Run the snapclient in the background
+        /usr/bin/snapclient -h $HOST $EXTRA_ARGS &
+        # Start ledfx in the foreground
+        cd /ledfx && exec /bin/sh -c '. /ledfx/venv/bin/activate && exec ledfx'
         ;;
     *)
-        echo "Usage: ROLE={server|client} [args]"
+        echo "Usage: ROLE={server|client|client-ledfx} [args]"
         exit 1
         ;;
 esac

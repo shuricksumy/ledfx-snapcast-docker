@@ -15,6 +15,25 @@
         - EXTRA_ARGS=--user snapclient:audio -s BTR3K --hostID FIIO
 ```
 
+# ledfx + snapclient
+
+```
+services:
+  snapclient:
+    image: test:latest
+    container_name: snapclient
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - HOST=192.168.88.111  # Static IP of Snapserver
+      - ROLE=client-ledfx
+      - EXTRA_ARGS=--user snapclient:audio -s BTR3K --hostID FIIO
+    volumes:
+      - ./ledfx:/root/.ledfx
+    devices:
+      - "/dev/snd:/dev/snd"  # Access to host audio devices
+```
+
 # snapserver
 
 ```

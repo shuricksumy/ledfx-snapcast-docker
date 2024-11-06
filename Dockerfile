@@ -2,22 +2,30 @@
 FROM alpine:latest AS builder
 
 # Install necessary packages
-RUN apk add --no-cache \
+# Install necessary packages
+RUN apk update && apk add --no-cache \
+    alpine-sdk \
+    alsa-lib-dev \
+    avahi-dev \
+    boost-dev \
     build-base \
     cmake \
-    alsa-lib-dev \
-    pulseaudio-dev \
-    libvorbis-dev \
-    opus-dev \
-    flac-dev \
-    soxr-dev \
-    avahi-dev \
-    expat-dev \
-    boost-dev \
-    git \
-    npm \
     curl \
-    alpine-sdk  
+    expat-dev \
+    flac-dev \
+    gcc \
+    git \
+    libffi-dev \
+    libvorbis-dev \
+    musl-dev \
+    npm \
+    opus-dev \
+    pulseaudio-dev \
+    py3-pip \
+    py3-virtualenv \
+    python3 \
+    python3-dev \
+    soxr-dev 
 
 # Clone Snapcast repository from the master branch
 WORKDIR /src
@@ -43,27 +51,40 @@ RUN npm install &&\
     make
 # <snapweb dir>dist
 
+# Set the working directory
+WORKDIR /ledfx
+
+# Create a Python virtual environment
+RUN python3 -m venv /ledfx/venv
+
+# Activate the virtual environment and install ledfx
+RUN . /ledfx/venv/bin/activate && pip install --upgrade pip && pip install ledfx numpy sounddevice
+
+
 FROM alpine:latest
 
 RUN apk add --no-cache musl \
+   python3 \
    dbus \
    avahi \
    avahi-compat-libdns_sd \
    alsa-lib \
    libgcc \
-   mpv
+   mpv \
+   portaudio 
 
-RUN rm -rf /var/cache/apk/*
-
+RUN rm -rf /var/cache/apk/* 
+    
 COPY --from=builder /src/snapweb/dist /usr/share/snapserver/snapweb
 COPY --from=builder /src/snapcast/bin/snapserver /usr/bin/snapserver
 COPY --from=builder /src/snapcast/bin/snapclient /usr/bin/snapclient
+COPY --from=builder /ledfx/venv /ledfx/venv
 
 WORKDIR /
 COPY snapserver.conf /etc/snapserver.conf
 COPY startup.sh startup.sh
 RUN chmod +x /startup.sh
-# EXPOSE 1704 1705 1780
+EXPOSE 1704 1705 1780
 ENTRYPOINT [ "/startup.sh" ]
 
 
