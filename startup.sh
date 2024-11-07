@@ -29,7 +29,7 @@ case "$ROLE" in
         echo "Run on host machine 'sudo modprobe snd-aloop'"
 
         # Start snapclient in a restartable loop
-        keep_alive /usr/bin/snapclient -h "$HOST" --sound alsa --soundcard "Loopback" &
+        keep_alive /usr/bin/snapclient -h "$HOST" --sound alsa --soundcard Loopback --hostID LedFX &
 
         # Start ledfx in a restartable loop
         cd /ledfx && keep_alive /bin/sh -c '. /ledfx/venv/bin/activate && exec ledfx'
