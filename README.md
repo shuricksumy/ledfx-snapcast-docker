@@ -16,7 +16,20 @@
 ```
 
 # LedFX
-## Need to run ```sudo modprobe snd-aloop``` to add Loopback device
+### Need to run ```sudo modprobe snd-aloop``` to add Loopback device
+
+- Add file ```ledfx.conf``` to ```/etc/modules-load.d/``` 
+- Reboot host linux
+- Select device ```Loopback``` in ledfx UI setting. 
+- Can be first or second device - just try what is the proper.
+  
+![image](https://github.com/user-attachments/assets/23bc92e0-c878-4807-9fa6-0597fbae3fe6)
+
+```ledfx.conf```
+```
+# add loop snd card to use it as input for ledfx
+snd-aloop
+```
 
 ```
 services:
