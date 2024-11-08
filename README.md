@@ -2,6 +2,7 @@
 
 # Snapclient
 
+```docker-compose.yaml```
 ```
  snapclient:
       image: shuricksumy/snapcast:latest
@@ -31,6 +32,7 @@
 snd-aloop
 ```
 
+```docker-compose.yaml```
 ```
 services:
   snapclient-ledfx:
@@ -50,6 +52,7 @@ services:
 
 # Snapserver
 
+```docker-compose.yaml```
 ```
     snapserver:
       image: shuricksumy/snapcast:latest
