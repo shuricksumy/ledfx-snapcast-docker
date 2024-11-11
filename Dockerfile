@@ -81,6 +81,7 @@ COPY --from=builder /src/snapcast/bin/snapclient /usr/bin/snapclient
 COPY --from=builder /ledfx/venv /ledfx/venv
 
 WORKDIR /
+RUN mkdir /data
 COPY snapserver.conf /etc/snapserver.conf
 COPY startup.sh startup.sh
 RUN chmod +x /startup.sh
