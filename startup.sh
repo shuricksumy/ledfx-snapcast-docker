@@ -3,11 +3,14 @@
 # Set default ROLE to 'server' if not set
 ROLE=${ROLE:-server}
 
-# Function to keep a command running with restart on crash
+# Function to keep a command running with restart on crash and log output
 keep_alive() {
+    cmd="$1"
+    shift
     while true; do
-        "$@"   # Run the command
-        echo "Process $@ crashed with exit code $?. Restarting in 1 second..."
+        echo "Starting process: $cmd $@"
+        $cmd "$@" 2>&1   # Run the command and capture all output
+        echo "Process $cmd $@ crashed with exit code $?. Restarting in 1 second..."
         sleep 1
     done
 }
@@ -18,21 +21,34 @@ case "$ROLE" in
         echo "Starting in server mode..."
         dbus-daemon --system
         avahi-daemon --no-chroot &
-        exec /usr/bin/snapserver $EXTRA_ARGS
+        exec /usr/bin/snapserver $EXTRA_ARGS 2>&1
         ;;
     client)
         echo "Starting in client mode..."
-        exec /usr/bin/snapclient -h "$HOST" $EXTRA_ARGS
+        exec /usr/bin/snapclient -h "$HOST" $EXTRA_ARGS 2>&1
         ;;
     ledfx)
         echo "Starting in client-ledfx mode..."
         echo "Run on host machine 'sudo modprobe snd-aloop'"
 
-        # Start snapclient in a restartable loop
-        keep_alive /usr/bin/snapclient -h "$HOST" --sound alsa --soundcard Loopback --hostID LedFX &
+        (
+            keep_alive /usr/bin/snapclient -h "$HOST" --sound alsa --soundcard "Loopback" --hostID LedFX
+        ) &
+        snapclient_pid=$!
 
-        # Start ledfx in a restartable loop
-        cd /ledfx && keep_alive /bin/sh -c '. /ledfx/venv/bin/activate && exec ledfx'
+        (
+            cd /ledfx
+            keep_alive /bin/sh -c '. /ledfx/venv/bin/activate && exec ledfx'
+        ) &
+        ledfx_pid=$!
+
+        # Wait for either process to terminate
+        wait -n $snapclient_pid $ledfx_pid
+
+        # If any process exits, kill the other and exit
+        echo "One of the processes has exited. Stopping both."
+        kill $snapclient_pid $ledfx_pid
+        wait
         ;;
     *)
         echo "Usage: ROLE={server|client|ledfx} [args]"

@@ -2,6 +2,29 @@
 
 # Snapclient
 
+### To use local Config file need to create it and mount
+
+```snapserver.conf```
+
+```
+touch ./snapserver.conf
+```
+
+```
+[stream]
+stream = tcp://0.0.0.0?name=Snapserver
+
+[http]
+enabled = true
+doc_root = /usr/share/snapserver/snapweb
+port = 1780
+
+[server]
+datadir = /data/
+
+```
+
+
 ```docker-compose.yaml```
 ```
  snapclient:
@@ -14,6 +37,11 @@
         - HOST=192.168.88.111  # Static IP of Snapserver
         - ROLE=client
         - EXTRA_ARGS=--user snapclient:audio -s BTR3K --hostID FIIO
+      volumes:
+        - ./config:/data
+     #  - ./snapserver.conf:/etc/snapserver.conf
+
+/etc/snapserver.conf
 ```
 
 # LedFX
