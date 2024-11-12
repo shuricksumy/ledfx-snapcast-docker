@@ -41,7 +41,7 @@ case "$ROLE" in
 
         (
             if [ -z "$EXTRA_ARGS" ]; then
-                EXTRA_ARGS='--sound alsa --soundcard "Loopback" --hostID LedFX'
+                EXTRA_ARGS='--sound alsa --soundcard Loopback --hostID LedFX'
                 echo "Setting default EXTRA_ARGS: $EXTRA_ARGS"
             else
                 echo "EXTRA_ARGS is set as: $EXTRA_ARGS"
