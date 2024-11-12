@@ -19,9 +19,17 @@ keep_alive() {
 case "$ROLE" in
     server)
         echo "Starting in server mode..."
+
+        if [ ! -f /config/snapserver.conf ]; then
+            cp /etc/snapserver.conf /config/snapserver.conf
+            echo "Default configuration copied to /config/snapserver.conf."
+        else
+            echo "Configuration file already exists in /config/snapserver.conf"
+        fi
+
         dbus-daemon --system
         avahi-daemon --no-chroot &
-        exec /usr/bin/snapserver $EXTRA_ARGS 2>&1
+        exec /usr/bin/snapserver -c /config/snapserver.conf $EXTRA_ARGS 2>&1
         ;;
     client)
         echo "Starting in client mode..."
@@ -32,7 +40,14 @@ case "$ROLE" in
         echo "Run on host machine 'sudo modprobe snd-aloop'"
 
         (
-            keep_alive /usr/bin/snapclient -h "$HOST" --sound alsa --soundcard "Loopback" --hostID LedFX
+            if [ -z "$EXTRA_ARGS" ]; then
+                EXTRA_ARGS='--sound alsa --soundcard "Loopback" --hostID LedFX'
+                echo "Setting default EXTRA_ARGS: $EXTRA_ARGS"
+            else
+                echo "EXTRA_ARGS is set as: $EXTRA_ARGS"
+            fi
+
+            keep_alive /usr/bin/snapclient -h "$HOST" $EXTRA_ARGS
         ) &
         snapclient_pid=$!
 
