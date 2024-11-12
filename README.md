@@ -2,29 +2,6 @@
 
 # Snapclient
 
-### To use local Config file need to create it and mount
-
-```snapserver.conf```
-
-```
-touch ./snapserver.conf
-```
-
-```
-[stream]
-stream = tcp://0.0.0.0?name=Snapserver
-
-[http]
-enabled = true
-doc_root = /usr/share/snapserver/snapweb
-port = 1780
-
-[server]
-datadir = /data/
-
-```
-
-
 ```docker-compose.yaml```
 ```
  snapclient:
@@ -36,21 +13,18 @@ datadir = /data/
       environment:
         - HOST=192.168.88.111  # Static IP of Snapserver
         - ROLE=client
-        - EXTRA_ARGS=--user snapclient:audio -s BTR3K --hostID FIIO
-      volumes:
-        - ./config:/data
-     #  - ./snapserver.conf:/etc/snapserver.conf
-
-/etc/snapserver.conf
+        # BT3K is sound card name
+        - EXTRA_ARGS=-s BTR3K --hostID FIIO
 ```
 
 # LedFX
 ### Need to run ```sudo modprobe snd-aloop``` to add Loopback device
 
-- Add file ```ledfx.conf``` to ```/etc/modules-load.d/``` 
-- Reboot host linux
+- Add file ```ledfx.conf``` to ```/etc/modules-load.d/``` on host machine
+- Reboot host machine or just run ```sudo modprobe snd-aloop```
+- Start docker container
 - Select device ```Loopback``` in ledfx UI setting. 
-- Can be first or second device - just try what is the proper.
+- Can be first or second device - just try what is the proper (for me, the second works).
   
 ![image](https://github.com/user-attachments/assets/23bc92e0-c878-4807-9fa6-0597fbae3fe6)
 
@@ -72,6 +46,8 @@ services:
     environment:
       - HOST=192.168.88.111  # Static IP of Snapserver
       - ROLE=ledfx
+      # Default EXTRA_ARGS is set as
+      # - EXTRA_ARGS=--sound alsa --soundcard "Loopback" --hostID LedFX
     volumes:
       - ./ledfx:/root/.ledfx
     devices:
@@ -91,4 +67,5 @@ services:
         - ROLE=server
       volumes:
         - ${DATA_DIR}/snapcast:/tmp/snapcast
+        - ./config:/config
 ```
