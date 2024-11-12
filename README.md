@@ -21,6 +21,11 @@
 ### Need to run ```sudo modprobe snd-aloop``` to add Loopback device
 
 - Add file ```ledfx.conf``` to ```/etc/modules-load.d/``` on host machine
+```ledfx.conf```
+```
+# add loop snd card to use it as input for ledfx
+snd-aloop
+```
 - Reboot host machine or just run ```sudo modprobe snd-aloop```
 - Start docker container
 - Select device ```Loopback``` in ledfx UI setting. 
@@ -28,11 +33,6 @@
   
 ![image](https://github.com/user-attachments/assets/23bc92e0-c878-4807-9fa6-0597fbae3fe6)
 
-```ledfx.conf```
-```
-# add loop snd card to use it as input for ledfx
-snd-aloop
-```
 
 ```docker-compose.yaml```
 ```
