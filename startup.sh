@@ -3,18 +3,6 @@
 # Set default ROLE to 'server' if not set
 ROLE=${ROLE:-server}
 
-# Function to keep a command running with restart on crash and log output
-keep_alive() {
-    cmd="$1"
-    shift
-    while true; do
-        echo "Starting process: $cmd $@"
-        $cmd "$@" 2>&1   # Run the command and capture all output
-        echo "Process $cmd $@ crashed with exit code $?. Restarting in 5 second..."
-        sleep 5
-    done
-}
-
 # Execute the appropriate application based on the ROLE variable
 case "$ROLE" in
     server)
@@ -33,12 +21,13 @@ case "$ROLE" in
         ;;
     client)
         echo "Starting in client mode..."
-        keep_alive /usr/bin/snapclient -h "$HOST" ${EXTRA_ARGS}
+        /usr/bin/snapclient -h "$HOST" ${EXTRA_ARGS}
         ;;
     ledfx)
         echo "Starting in client-ledfx mode..."
         echo "Run on host machine 'sudo modprobe snd-aloop'"
 
+        # Launch the processes in the background
         (
             if [ -z "${EXTRA_ARGS}" ]; then
                 EXTRA_ARGS='--sound alsa --soundcard Loopback --hostID LedFX'
@@ -47,23 +36,25 @@ case "$ROLE" in
                 echo "EXTRA_ARGS is set as: ${EXTRA_ARGS}"
             fi
 
-            keep_alive /usr/bin/snapclient -h "${HOST}" ${EXTRA_ARGS}
+            /usr/bin/snapclient -h "${HOST}" ${EXTRA_ARGS}
         ) &
         snapclient_pid=$!
 
         (
             cd /ledfx
-            keep_alive /bin/sh -c '. /ledfx/venv/bin/activate && exec ledfx'
+            . /ledfx/venv/bin/activate
+            exec ledfx
         ) &
         ledfx_pid=$!
 
-        # Wait for either process to terminate
+        # Wait for any process to exit
         wait -n $snapclient_pid $ledfx_pid
 
-        # If any process exits, kill the other and exit
+        # If any process exits, terminate the other and exit the script
         echo "One of the processes has exited. Stopping both."
         kill $snapclient_pid $ledfx_pid
         wait
+        exit 1
         ;;
     *)
         echo "Usage: ROLE={server|client|ledfx} [args]"

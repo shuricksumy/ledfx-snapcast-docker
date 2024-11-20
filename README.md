@@ -8,6 +8,11 @@
       image: shuricksumy/snapcast:latest
       container_name: snapclient
       restart: unless-stopped
+      deploy:
+        restart_policy:
+          condition: on-failure
+          delay: 5s
+          max_attempts: 0
       devices:
         - "/dev/snd:/dev/snd"  # Access to host audio devices
       environment:
@@ -41,6 +46,11 @@ services:
     image: shuricksumy/snapcast:latest
     container_name: snapclient-ledfx
     restart: unless-stopped
+    deploy:
+        restart_policy:
+          condition: on-failure
+          delay: 5s
+          max_attempts: 0
     ports:
       - "8888:8888" # ledfx web port
     environment:
@@ -62,6 +72,11 @@ services:
       image: shuricksumy/snapcast:latest
       container_name: snapserver
       restart: unless-stopped
+      deploy:
+        restart_policy:
+          condition: on-failure
+          delay: 5s
+          max_attempts: 0
       network_mode: host
       environment:
         - ROLE=server
