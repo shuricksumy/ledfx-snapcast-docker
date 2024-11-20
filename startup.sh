@@ -10,8 +10,8 @@ keep_alive() {
     while true; do
         echo "Starting process: $cmd $@"
         $cmd "$@" 2>&1   # Run the command and capture all output
-        echo "Process $cmd $@ crashed with exit code $?. Restarting in 1 second..."
-        sleep 1
+        echo "Process $cmd $@ crashed with exit code $?. Restarting in 5 second..."
+        sleep 5
     done
 }
 
@@ -29,25 +29,25 @@ case "$ROLE" in
 
         dbus-daemon --system
         avahi-daemon --no-chroot &
-        exec /usr/bin/snapserver -c /config/snapserver.conf $EXTRA_ARGS 2>&1
+        exec /usr/bin/snapserver -c /config/snapserver.conf ${EXTRA_ARGS} 2>&1
         ;;
     client)
         echo "Starting in client mode..."
-        exec /usr/bin/snapclient -h "$HOST" $EXTRA_ARGS 2>&1
+        keep_alive /usr/bin/snapclient -h "$HOST" ${EXTRA_ARGS}
         ;;
     ledfx)
         echo "Starting in client-ledfx mode..."
         echo "Run on host machine 'sudo modprobe snd-aloop'"
 
         (
-            if [ -z "$EXTRA_ARGS" ]; then
+            if [ -z "${EXTRA_ARGS}" ]; then
                 EXTRA_ARGS='--sound alsa --soundcard Loopback --hostID LedFX'
-                echo "Setting default EXTRA_ARGS: $EXTRA_ARGS"
+                echo "Setting default EXTRA_ARGS: ${EXTRA_ARGS}"
             else
-                echo "EXTRA_ARGS is set as: $EXTRA_ARGS"
+                echo "EXTRA_ARGS is set as: ${EXTRA_ARGS}"
             fi
 
-            keep_alive /usr/bin/snapclient -h "$HOST" $EXTRA_ARGS
+            keep_alive /usr/bin/snapclient -h "${HOST}" ${EXTRA_ARGS}
         ) &
         snapclient_pid=$!
 
