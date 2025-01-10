@@ -58,8 +58,8 @@ WORKDIR /ledfx
 RUN python3 -m venv /ledfx/venv
 
 # Activate the virtual environment and install ledfx
-RUN . /ledfx/venv/bin/activate && pip install pip setuptools --upgrade && pip install Pyrebase4 ledfx numpy sounddevice
-
+RUN . /ledfx/venv/bin/activate && pip install --upgrade pip setuptools 
+RUN . /ledfx/venv/bin/activate && pip install ledfx numpy sounddevice
 
 FROM alpine:latest
 
