@@ -1,31 +1,38 @@
 # Step 1: Builder Stage
-FROM alpine:latest AS builder
+FROM debian:stable-slim AS builder
 
 # Install necessary packages
 # Install necessary packages
-RUN apk update && apk add --no-cache \
-    alpine-sdk \
-    alsa-lib-dev \
-    avahi-dev \
-    boost-dev \
-    build-base \
-    cmake \
-    curl \
-    expat-dev \
-    flac-dev \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y \
+    build-essential \
+    cmake
+RUN apt-get install -y \
+    libasound2-dev \
+    libpulse-dev \
+    libvorbisidec-dev \
+    libvorbis-dev \
+    libopus-dev \
+    libflac-dev \
+    libsoxr-dev \
+    alsa-utils \
+    libavahi-client-dev \
+    avahi-daemon \
+    libexpat1-dev \
+    libatlas3-base \
+    portaudio19-dev \
+    pulseaudio \
     gcc \
     git \
-    libffi-dev \
-    libvorbis-dev \
-    musl-dev \
+    python3-pip \
+    python3-venv \
+    avahi-daemon \
+    libboost-system-dev \
+    libboost-thread-dev \
+    libboost-program-options-dev \
+    libboost-test-dev \
+    nodejs \
     npm \
-    opus-dev \
-    pulseaudio-dev \
-    py3-pip \
-    py3-virtualenv \
-    python3 \
-    python3-dev \
-    soxr-dev 
+    python3-numpy
 
 # Clone Snapcast repository from the master branch
 WORKDIR /src
@@ -58,22 +65,18 @@ WORKDIR /ledfx
 RUN python3 -m venv /ledfx/venv
 
 # Activate the virtual environment and install ledfx
-RUN . /ledfx/venv/bin/activate && pip install --upgrade pip setuptools wheel
-RUN . /ledfx/venv/bin/activate && pip install ledfx numpy sounddevice
+RUN /ledfx/venv/bin/python -m pip install --upgrade pip wheel setuptools
+RUN /ledfx/venv/bin/pip install sounddevice
+RUN /ledfx/venv/bin/python -m pip install ledfx
 
-FROM alpine:latest
+FROM debian:stable-slim
 
-RUN apk add --no-cache musl \
-   python3 \
-   dbus \
-   avahi \
-   avahi-compat-libdns_sd \
-   alsa-lib \
-   libgcc \
-   mpv \
-   portaudio 
+RUN apt-get update && apt-get upgrade -y && apt-get install -y \
+    alsa-utils
 
-RUN rm -rf /var/cache/apk/* 
+RUN apt-get autoremove -y \
+    && apt-get clean -y \
+    && rm -rf /var/lib/apt/lists/*
     
 COPY --from=builder /src/snapweb/dist /usr/share/snapserver/snapweb
 COPY --from=builder /src/snapcast/bin/snapserver /usr/bin/snapserver
