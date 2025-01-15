@@ -72,7 +72,10 @@ RUN /ledfx/venv/bin/python -m pip install ledfx
 FROM debian:stable-slim
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
-    alsa-utils
+    alsa-utils \
+    dbus-daemon \
+    avahi-daemon \
+    libavahi-common-dev
 
 RUN apt-get autoremove -y \
     && apt-get clean -y \
