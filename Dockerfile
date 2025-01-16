@@ -77,7 +77,14 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     avahi-daemon \
     libavahi-common-dev \
     libavahi-client3 \
-    libavahi-client-dev
+    libavahi-client-dev \
+    libvorbis-dev \
+    libvorbisidec1 \
+    libflac12 \
+    libopus0 \
+    libsoxr0 \
+    libjack0
+
 
 RUN apt-get autoremove -y \
     && apt-get clean -y \

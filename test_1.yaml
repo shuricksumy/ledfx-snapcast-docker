@@ -1,0 +1,17 @@
+services: 
+  snapclient:
+    image: dc8ca81f78b9
+    container_name: snapclient
+    restart: unless-stopped
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 0
+    # devices:
+      # - "/dev/snd:/dev/snd"  # Access to host audio devices
+    environment:
+      - HOST=192.168.88.111  # Static IP of Snapserver
+      - ROLE=client
+      # BT3K is sound card name
+      - EXTRA_ARGS=-s BTR3K --hostID FIIO

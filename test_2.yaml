@@ -1,0 +1,21 @@
+services: 
+  snapclient-ledfx:
+    image: dc8ca81f78b9
+    container_name: snapclient-ledfx
+    restart: unless-stopped
+    deploy:
+        restart_policy:
+          condition: on-failure
+          delay: 5s
+          max_attempts: 0
+    ports:
+      - "8888:8888" # ledfx web port
+    environment:
+      - HOST=192.168.88.111  # Static IP of Snapserver
+      - ROLE=ledfx
+      # Default EXTRA_ARGS is set as
+      # - EXTRA_ARGS=--sound alsa --soundcard "Loopback" --hostID LedFX
+    # volumes:
+    #   - ./ledfx:/root/.ledfx
+    # devices:
+    #   - "/dev/snd:/dev/snd"  # Access to host audio devices
