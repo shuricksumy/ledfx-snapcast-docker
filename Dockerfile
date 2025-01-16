@@ -75,7 +75,9 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     alsa-utils \
     dbus-daemon \
     avahi-daemon \
-    libavahi-common-dev
+    libavahi-common-dev \
+    libavahi-client3 \
+    libavahi-client-dev
 
 RUN apt-get autoremove -y \
     && apt-get clean -y \
