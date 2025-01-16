@@ -83,7 +83,11 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     libflac12 \
     libopus0 \
     libsoxr0 \
-    libjack0
+    libjack0 \
+    python3 \
+    libportaudio2 \
+    libatlas3-base \
+    portaudio19-dev 
 
 
 RUN apt-get autoremove -y \

@@ -43,7 +43,7 @@ case "$ROLE" in
         (
             cd /ledfx
             . /ledfx/venv/bin/activate
-            exec ledfx
+            exec /ledfx/venv/bin/ledfx
         ) &
         ledfx_pid=$!
 
