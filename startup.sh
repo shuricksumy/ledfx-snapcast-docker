@@ -48,7 +48,7 @@ case "$ROLE" in
         ledfx_pid=$!
 
         # Wait for any process to exit
-        wait -n $snapclient_pid $ledfx_pid
+        wait $snapclient_pid $ledfx_pid
 
         # If any process exits, terminate the other and exit the script
         echo "One of the processes has exited. Stopping both."
