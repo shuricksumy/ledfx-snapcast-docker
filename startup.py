@@ -18,8 +18,22 @@ def start_server_mode(extra_args):
     else:
         print("[Startup ➡️ ] Configuration file already exists in /config/snapserver.conf.", flush=True)
 
-    subprocess.run(["dbus-daemon", "--system"], check=True)
-    subprocess.Popen(["avahi-daemon", "--no-chroot"])
+    try:
+        print("[Startup ➡️ ] dbus-daemon starting...", flush=True)
+        subprocess.run(["dbus-daemon", "--system"], check=True)
+    except subprocess.CalledProcessError as e:
+       print(f"[Startup ➡️ ] Failed to start dbus-daemon: {e}", check=True)
+    except Exception as e:
+        print(f"[Startup ➡️ ] Unexpected error when starting dbus-daemon: {e}", check=True)
+   
+    try:
+        print("[Startup ➡️ ] avahi-daemon starting...", flush=True)
+        subprocess.Popen(["avahi-daemon", "--no-chroot"])
+    except subprocess.CalledProcessError as e:
+       print(f"[Startup ➡️ ] Failed to start avahi-daemon: {e}", check=True)
+    except Exception as e:
+        print(f"[Startup ➡️ ] Unexpected error when starting avahi-daemon: {e}", check=True)
+        
     subprocess.run(["/usr/bin/snapserver", "-c", str(config_path)] + extra_args, check=True)
 
 def start_client_mode(host, extra_args):
