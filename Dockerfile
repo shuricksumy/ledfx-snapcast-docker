@@ -5,7 +5,8 @@ FROM debian:bookworm-slim AS builder
 # Install necessary packages
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     build-essential \
-    cmake
+    cmake \
+    python3
 RUN apt-get install -y \
     libasound2-dev \
     libpulse-dev \
