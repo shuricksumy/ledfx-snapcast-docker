@@ -3,37 +3,47 @@ FROM debian:bookworm-slim AS builder
 
 # Install necessary packages
 # Install necessary packages
+# RUN apt-get update && apt-get upgrade -y && apt-get install -y \
+#     build-essential \
+#     cmake \
+#     python3
+# RUN apt-get install -y \
+#     libasound2-dev \
+#     libpulse-dev \
+#     libvorbisidec-dev \
+#     libvorbis-dev \
+#     libopus-dev \
+#     libflac-dev \
+#     libsoxr-dev \
+#     alsa-utils \
+#     libavahi-client-dev \
+#     avahi-daemon \
+#     libexpat1-dev \
+#     libatlas3-base \
+#     portaudio19-dev \
+#     pulseaudio \
+#     gcc \
+#     git \
+#     python3-pip \
+#     python3-venv \
+#     avahi-daemon \
+#     libboost-system-dev \
+#     libboost-thread-dev \
+#     libboost-program-options-dev \
+#     libboost-test-dev \
+#     nodejs \
+#     npm \
+#     python3-numpy
+
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
-    build-essential \
-    cmake \
-    python3
-RUN apt-get install -y \
-    libasound2-dev \
-    libpulse-dev \
-    libvorbisidec-dev \
-    libvorbis-dev \
-    libopus-dev \
-    libflac-dev \
-    libsoxr-dev \
-    alsa-utils \
-    libavahi-client-dev \
-    avahi-daemon \
-    libexpat1-dev \
-    libatlas3-base \
-    portaudio19-dev \
-    pulseaudio \
-    gcc \
-    git \
-    python3-pip \
-    python3-venv \
-    avahi-daemon \
-    libboost-system-dev \
-    libboost-thread-dev \
-    libboost-program-options-dev \
-    libboost-test-dev \
     nodejs \
     npm \
-    python3-numpy
+    python3-numpy \
+    pkg-config \
+    build-essential \
+    cmake \
+    python3-pip \
+    python3-venv
 
 # ## Clone Snapcast repository from the master branch
 # WORKDIR /src
