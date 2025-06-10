@@ -102,7 +102,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     portaudio19-dev  \
     pulseaudio \
     pulseaudio-utils \
-    libpulse0 \
+    libpulse0
 
 
 # Set environment variables to detect architecture
