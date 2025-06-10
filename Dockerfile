@@ -99,7 +99,10 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     python3 \
     libportaudio2 \
     libatlas3-base \
-    portaudio19-dev 
+    portaudio19-dev  \
+    pulseaudio \
+    pulseaudio-utils \
+    libpulse0 \
 
 
 # Set environment variables to detect architecture
@@ -115,10 +118,10 @@ COPY pkg/snapclient_0.31.0-1_arm64_bookworm_with-pulse.deb  /tmp/pkg/snapclient_
 COPY pkg/snapserver_0.31.0-1_arm64_bookworm.deb             /tmp/pkg/snapserver_0.31.0-1_arm64_bookworm.deb
 
 RUN if [ "$(dpkg --print-architecture)" = "arm64" ]; then \
-        apt-get install -y /tmp/pkg/snapclient_0.31.0-1_arm64_bookworm.deb; \
+        apt-get install -y /tmp/pkg/snapclient_0.31.0-1_arm64_bookworm_with-pulse.deb; \
         apt-get install -y /tmp/pkg/snapserver_0.31.0-1_arm64_bookworm.deb; \
     elif [ "$(dpkg --print-architecture)" = "amd64" ]; then \
-        apt-get install -y /tmp/pkg/snapclient_0.31.0-1_amd64_bookworm.deb; \
+        apt-get install -y /tmp/pkg/snapclient_0.31.0-1_amd64_bookworm_with-pulse.deb; \
         apt-get install -y /tmp/pkg/snapserver_0.31.0-1_amd64_bookworm.deb; \
     else \
         echo "Unsupported architecture"; exit 1; \
