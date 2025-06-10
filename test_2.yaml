@@ -1,6 +1,6 @@
 services: 
   snapclient-ledfx:
-    image: dc8ca81f78b9
+    image: ec4f754b684e
     container_name: snapclient-ledfx
     restart: unless-stopped
     deploy:
