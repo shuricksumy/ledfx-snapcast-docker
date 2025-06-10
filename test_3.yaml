@@ -1,16 +1,13 @@
-services:    
+version: '3.9'
+services:
   snapserver:
-      image: dc8ca81f78b9
-      container_name: snapserver
-      restart: unless-stopped
-      deploy:
-        restart_policy:
-          condition: on-failure
-          delay: 5s
-          max_attempts: 0
-      network_mode: host
-      environment:
-        - ROLE=server
-      # volumes:
-      #   - ${DATA_DIR}/snapcast:/tmp/snapcast
-      #   - ./config:/config
+    image: dc8ca81f78b9
+    container_name: snapserver
+    environment:
+      - ROLE=server
+    #  - EXTRA_ARGS=
+    volumes:
+      - ${DATA_DIR}/snapcast:/tmp/snapcast
+      - ${DATA_DIR}/snapserver/config:/config
+    network_mode: host
+    restart: unless-stopped

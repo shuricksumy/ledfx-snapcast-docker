@@ -4,22 +4,31 @@
 
 ```docker-compose.yaml```
 ```
- snapclient:
-      image: shuricksumy/snapcast:latest
-      container_name: snapclient
-      restart: unless-stopped
-      deploy:
-        restart_policy:
-          condition: on-failure
-          delay: 5s
-          max_attempts: 0
-      devices:
-        - "/dev/snd:/dev/snd"  # Access to host audio devices
-      environment:
-        - HOST=192.168.88.111  # Static IP of Snapserver
-        - ROLE=client
-        # BT3K is sound card name
-        - EXTRA_ARGS=-s BTR3K --hostID FIIO
+version: '3.9'
+
+services:
+  snapclient:
+    image: your-snapcast-image:latest
+    container_name: snapclient
+    environment:
+      - ROLE=client
+      - HOST=192.168.1.100  # Replace with Snapserver IP
+      - EXTRA_ARGS=--sound pulse --soundcard alsa_output.pci-0000_00_1b.0.analog-stereo.monitor --hostID FIIO
+      - PULSE_SERVER=unix:/run/user/1000/pulse/native
+    volumes:
+      - $XDG_RUNTIME_DIR/pulse:/run/user/1000/pulse
+      - ~/.config/pulse/cookie:/root/.config/pulse/cookie
+      - /dev/snd:/dev/snd  # Allow access to ALSA sound devices
+    devices:
+      - /dev/snd
+    network_mode: host
+    restart: unless-stopped
+
+    # 🔄 To use ALSA instead of PulseAudio:
+    # environment:
+    #   - ROLE=client
+    #   - HOST=192.168.1.100
+    #   - EXTRA_ARGS=--sound alsa --soundcard default --hostID FIIO
 ```
 
 # LedFX
@@ -41,46 +50,51 @@ snd-aloop
 
 ```docker-compose.yaml```
 ```
+version: '3.9'
+
 services:
-  snapclient-ledfx:
-    image: shuricksumy/snapcast:latest
-    container_name: snapclient-ledfx
-    restart: unless-stopped
-    deploy:
-        restart_policy:
-          condition: on-failure
-          delay: 5s
-          max_attempts: 0
-    ports:
-      - "8888:8888" # ledfx web port
+  ledfx:
+    image: your-snapcast-image:latest
+    container_name: ledfx
     environment:
-      - HOST=192.168.88.111  # Static IP of Snapserver
       - ROLE=ledfx
-      # Default EXTRA_ARGS is set as
-      # - EXTRA_ARGS=--sound alsa --soundcard "Loopback" --hostID LedFX
+      - HOST=192.168.1.100  # Replace with your Snapserver IP
+      - EXTRA_ARGS=--sound pulse --soundcard alsa_output.pci-0000_00_1b.0.analog-stereo.monitor --hostID LedFX
+      - PULSE_SERVER=unix:/run/user/1000/pulse/native
     volumes:
       - ./ledfx:/root/.ledfx
+      - $XDG_RUNTIME_DIR/pulse:/run/user/1000/pulse
+      - ~/.config/pulse/cookie:/root/.config/pulse/cookie
+      - /dev/snd:/dev/snd
     devices:
-      - "/dev/snd:/dev/snd"  # Access to host audio devices
+      - /dev/snd
+    #network_mode: host
+    ports:
+      - "8889:8888" # ledfx web port
+    restart: unless-stopped
+
+    # 🔄 To use ALSA (ensure loopback is enabled):
+    # environment:
+    #   - ROLE=ledfx
+    #   - HOST=192.168.1.100
+    #   - EXTRA_ARGS=--sound alsa --soundcard Loopback --hostID LedFX
 ```
 
 # Snapserver
 
 ```docker-compose.yaml```
 ```
-    snapserver:
-      image: shuricksumy/snapcast:latest
-      container_name: snapserver
-      restart: unless-stopped
-      deploy:
-        restart_policy:
-          condition: on-failure
-          delay: 5s
-          max_attempts: 0
-      network_mode: host
-      environment:
-        - ROLE=server
-      volumes:
-        - ${DATA_DIR}/snapcast:/tmp/snapcast
-        - ./config:/config
+version: '3.9'
+services:
+  snapserver:
+    image: dc8ca81f78b9
+    container_name: snapserver
+    environment:
+      - ROLE=server
+    #  - EXTRA_ARGS=
+    volumes:
+      - ${DATA_DIR}/snapcast:/tmp/snapcast
+      - ${DATA_DIR}/snapserver/config:/config
+    network_mode: host
+    restart: unless-stopped
 ```
