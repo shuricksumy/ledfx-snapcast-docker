@@ -13,9 +13,12 @@ services:
     environment:
       - HOST=192.168.88.111  # Static IP of Snapserver
       - ROLE=ledfx
+      - PULSE_SERVER=unix:/run/user/1000/pulse/native
+      - EXTRA_ARGS="--hostID=MyClient --sound=pulse --soundcard=default"
       # Default EXTRA_ARGS is set as
       # - EXTRA_ARGS=--sound alsa --soundcard "Loopback" --hostID LedFX
-    # volumes:
-    #   - ./ledfx:/root/.ledfx
-    # devices:
-    #   - "/dev/snd:/dev/snd"  # Access to host audio devices
+    volumes:
+      - ./ledfx:/root/.ledfx
+      - /run/user/1000/pulse:/run/user/1000/pulse
+    devices:
+      - "/dev/snd:/dev/snd"  # Access to host audio devicess
