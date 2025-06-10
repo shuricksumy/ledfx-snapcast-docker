@@ -1,24 +1,28 @@
-services: 
-  snapclient-ledfx:
-    image: dc8ca81f78b9
-    container_name: snapclient-ledfx
-    restart: unless-stopped
-    deploy:
-        restart_policy:
-          condition: on-failure
-          delay: 5s
-          max_attempts: 0
-    ports:
-      - "8888:8888" # ledfx web port
+version: '3.9'
+
+services:
+  ledfx:
+    image: your-snapcast-image:latest
+    container_name: ledfx
     environment:
-      - HOST=192.168.88.111  # Static IP of Snapserver
       - ROLE=ledfx
+      - HOST=192.168.1.100  # Replace with your Snapserver IP
+      - EXTRA_ARGS=--sound pulse --soundcard alsa_output.pci-0000_00_1b.0.analog-stereo.monitor --hostID LedFX
       - PULSE_SERVER=unix:/run/user/1000/pulse/native
-      - EXTRA_ARGS="--hostID=MyClient --sound=pulse --soundcard=default"
-      # Default EXTRA_ARGS is set as
-      # - EXTRA_ARGS=--sound alsa --soundcard "Loopback" --hostID LedFX
     volumes:
       - ./ledfx:/root/.ledfx
-      - /run/user/1000/pulse:/run/user/1000/pulse
+      - $XDG_RUNTIME_DIR/pulse:/run/user/1000/pulse
+      - ~/.config/pulse/cookie:/root/.config/pulse/cookie
+      - /dev/snd:/dev/snd
     devices:
-      - "/dev/snd:/dev/snd"  # Access to host audio devicess
+      - /dev/snd
+    #network_mode: host
+    ports:
+      - "8889:8888" # ledfx web port
+    restart: unless-stopped
+
+    # 🔄 To use ALSA (ensure loopback is enabled):
+    # environment:
+    #   - ROLE=ledfx
+    #   - HOST=192.168.1.100
+    #   - EXTRA_ARGS=--sound alsa --soundcard Loopback --hostID LedFX

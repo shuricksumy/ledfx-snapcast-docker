@@ -1,17 +1,25 @@
-services: 
+version: '3.9'
+
+services:
   snapclient:
-    image: dc8ca81f78b9
+    image: your-snapcast-image:latest
     container_name: snapclient
-    restart: unless-stopped
-    deploy:
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 0
-    # devices:
-      # - "/dev/snd:/dev/snd"  # Access to host audio devices
     environment:
-      - HOST=192.168.88.111  # Static IP of Snapserver
       - ROLE=client
-      # BT3K is sound card name
-      - EXTRA_ARGS=-s BTR3K --hostID FIIO
+      - HOST=192.168.1.100  # Replace with Snapserver IP
+      - EXTRA_ARGS=--sound pulse --soundcard alsa_output.pci-0000_00_1b.0.analog-stereo.monitor --hostID FIIO
+      - PULSE_SERVER=unix:/run/user/1000/pulse/native
+    volumes:
+      - $XDG_RUNTIME_DIR/pulse:/run/user/1000/pulse
+      - ~/.config/pulse/cookie:/root/.config/pulse/cookie
+      - /dev/snd:/dev/snd  # Allow access to ALSA sound devices
+    devices:
+      - /dev/snd
+    network_mode: host
+    restart: unless-stopped
+
+    # 🔄 To use ALSA instead of PulseAudio:
+    # environment:
+    #   - ROLE=client
+    #   - HOST=192.168.1.100
+    #   - EXTRA_ARGS=--sound alsa --soundcard default --hostID FIIO
