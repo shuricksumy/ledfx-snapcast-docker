@@ -4,11 +4,12 @@ import os
 import sys
 import subprocess
 import signal
+import shutil
 from pathlib import Path
 from time import sleep
+from datetime import datetime
 
 def log_message(level, message):
-    from datetime import datetime
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{timestamp}] [{level}]  ➡️  {message}", flush=True)
 
@@ -20,7 +21,7 @@ def detect_audio_backend():
         try:
             import sounddevice as sd
             devices = sd.query_devices()
-            for i, d in enumerate(devices):
+            for d in devices:
                 if d['max_output_channels'] > 0:
                     return "alsa", d['name']
         except Exception:
@@ -31,7 +32,7 @@ def print_available_devices():
     try:
         import sounddevice as sd
         devices = sd.query_devices()
-        print("\nAvailable Audio Output Devices:")
+        print("\nAvailable Audio Output Devices (via sounddevice):")
         print("--------------------------------------------------")
         for idx, dev in enumerate(devices):
             if dev['max_output_channels'] > 0:
@@ -39,7 +40,15 @@ def print_available_devices():
         print("\nTo manually select a device, set:")
         print("  EXTRA_ARGS=\"--sound=alsa --soundcard='DEVICE_NAME_OR_INDEX'\"\n")
     except Exception as e:
-        log_message("ERROR", f"Unable to list audio devices: {e}")
+        log_message("ERROR", f"Unable to list audio devices via sounddevice: {e}")
+
+    if shutil.which("pactl"):
+        print("\nAvailable PulseAudio Sources (via pactl):")
+        print("--------------------------------------------------")
+        try:
+            subprocess.run(["pactl", "list", "short", "sources"], check=False)
+        except Exception as e:
+            log_message("ERROR", f"Failed to list sources via pactl: {e}")
 
 def start_server_mode(extra_args):
     log_message("INFO", "Starting in server mode...")
@@ -53,7 +62,6 @@ def start_server_mode(extra_args):
         log_message("INFO", "Configuration file already exists in /config/snapserver.conf.")
 
     try:
-        log_message("INFO", "Starting dbus-daemon...")
         if not Path("/run/dbus").exists():
             Path("/run/dbus").mkdir(parents=True, exist_ok=True)
         subprocess.run(["dbus-daemon", "--system"], check=True)
@@ -62,8 +70,8 @@ def start_server_mode(extra_args):
         log_message("ERROR", f"DBus start error: {e}")
 
     try:
-        log_message("INFO", "Starting avahi-daemon...")
         subprocess.Popen(["avahi-daemon", "--no-chroot"])
+        log_message("INFO", "avahi-daemon started.")
     except Exception as e:
         log_message("ERROR", f"Avahi start error: {e}")
 
@@ -122,14 +130,19 @@ def main():
     extra_args_env = os.getenv("EXTRA_ARGS", "")
     extra_args = extra_args_env.split() if extra_args_env else []
 
-    # Auto-detect audio backend if not provided and we're in client mode
+    # Always show audio devices at startup
+    log_message("INFO", "Enumerating audio devices before starting...")
+    print_available_devices()
+
+    # Autodetect audio backend for client or ledfx if not explicitly set
     if role in ("client", "ledfx") and not extra_args:
         backend, device = detect_audio_backend()
         if backend:
-            extra_args = [f"--sound={backend}", f"--soundcard={device}", "--hostID=AutoClient"]
             log_message("INFO", f"Autodetected audio: backend={backend}, device={device}")
+            extra_args = [f"--sound={backend}", f"--soundcard={device}", "--hostID=AutoClient"]
         else:
-            log_message("WARNING", "No audio backend found. Snapclient may fail.")
+            log_message("WARNING", "No valid audio backend found.")
+            print_available_devices()
 
     if role == "server":
         start_server_mode(extra_args)
