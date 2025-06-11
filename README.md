@@ -29,6 +29,8 @@ services:
     #   - ROLE=client
     #   - HOST=192.168.1.100
     #   - EXTRA_ARGS=--sound alsa --soundcard default --hostID FIIO
+    #   Some more comlex config for DAC
+    #   - EXTRA_ARGS=--sound alsa --sampleformat 48000:24:* --soundcard plughw:CARD=Pro,DEV=0 --hostID MX3-Pro
 ```
 
 # LedFX
