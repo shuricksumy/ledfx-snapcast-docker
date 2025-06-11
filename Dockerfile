@@ -78,8 +78,8 @@ RUN python3 -m venv /ledfx/venv
 # Activate the virtual environment and install ledfx
 RUN /ledfx/venv/bin/python -m pip install --upgrade pip wheel setuptools
 RUN /ledfx/venv/bin/pip install sounddevice
-#RUN /ledfx/venv/bin/python -m pip install ledfx
-RUN /ledfx/venv/bin/python -m pip install git+https://github.com/LedFx/LedFx.git
+RUN /ledfx/venv/bin/python -m pip install ledfx
+#RUN /ledfx/venv/bin/python -m pip install git+https://github.com/LedFx/LedFx.git
 
 FROM debian:bookworm-slim
 
