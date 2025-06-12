@@ -6,31 +6,27 @@
 ```
 version: '3.9'
 
-services:
   snapclient:
-    image: your-snapcast-image:latest
+    image: ghcr.io/shuricksumy/snapcast:latest
     container_name: snapclient
-    environment:
-      - ROLE=client
-      - HOST=192.168.1.100  # Replace with Snapserver IP
-      - EXTRA_ARGS=--sound pulse --soundcard alsa_output.pci-0000_00_1b.0.analog-stereo.monitor --hostID FIIO
-      - PULSE_SERVER=unix:/run/user/1000/pulse/native
-    volumes:
-      - $XDG_RUNTIME_DIR/pulse:/run/user/1000/pulse
-      - ~/.config/pulse/cookie:/root/.config/pulse/cookie
-      - /dev/snd:/dev/snd  # Allow access to ALSA sound devices
-    devices:
-      - /dev/snd
-    network_mode: host
     restart: unless-stopped
-
-    # 🔄 To use ALSA instead of PulseAudio:
-    # environment:
-    #   - ROLE=client
-    #   - HOST=192.168.1.100
-    #   - EXTRA_ARGS=--sound alsa --soundcard default --hostID FIIO
-    #   Some more comlex config for DAC
-    #   - EXTRA_ARGS=--sound alsa --sampleformat 48000:24:* --soundcard plughw:CARD=Pro,DEV=0 --hostID MX3-Pro
+    devices:
+      - "/dev/snd:/dev/snd"
+    environment:
+      - UID=1000
+      - GID=1000
+      - ROLE=client
+      - HOST=192.168.88.111
+      - DEVICE_NAME=DX3 Pro
+      - SOUND_BACKEND=alsa
+      - CLIENT_ID=DX3 Pro
+      - EXTRA_ARGS=--sampleformat 48000:24:*
+    volumes:
+      - /dev/snd:/dev/snd
+      - $XDG_RUNTIME_DIR/pulse:/run/user/1000/pulse
+    networks:
+      - default
+      - npm_proxy
 ```
 
 # LedFX
@@ -55,31 +51,25 @@ snd-aloop
 version: '3.9'
 
 services:
-  ledfx:
-    image: your-snapcast-image:latest
-    container_name: ledfx
-    environment:
-      - ROLE=ledfx
-      - HOST=192.168.1.100  # Replace with your Snapserver IP
-      - EXTRA_ARGS=--sound pulse --soundcard alsa_output.pci-0000_00_1b.0.analog-stereo.monitor --hostID LedFX
-      - PULSE_SERVER=unix:/run/user/1000/pulse/native
-    volumes:
-      - ./ledfx:/root/.ledfx
-      - $XDG_RUNTIME_DIR/pulse:/run/user/1000/pulse
-      - ~/.config/pulse/cookie:/root/.config/pulse/cookie
-      - /dev/snd:/dev/snd
-    devices:
-      - /dev/snd
-    #network_mode: host
-    ports:
-      - "8889:8888" # ledfx web port
-    restart: unless-stopped
-
-    # 🔄 To use ALSA (ensure loopback is enabled):
-    # environment:
-    #   - ROLE=ledfx
-    #   - HOST=192.168.1.100
-    #   - EXTRA_ARGS=--sound alsa --soundcard Loopback --hostID LedFX
+    snapclient-ledfx:
+      image: ghcr.io/shuricksumy/snapcast:latest
+      container_name: snapclient-ledfx
+      restart: unless-stopped
+      ports:
+        - "8889:8888" # ledfx web port
+      devices:
+        - "/dev/snd:/dev/snd"  # Access to host audio devices
+      environment:
+        - HOST=192.168.88.111  # Static IP of Snapserver
+        - ROLE=ledfx
+        - PULSE_SERVER=unix:/run/user/1000/pulse/native
+        - SOUND_BACKEND=alsa
+        - DEVICE_NAME=Loopback
+        - CLIENT_ID=LedFX
+        #- EXTRA_ARGS=--sound pulse --hostID LedFX --input-device=default
+      volumes:
+        - $DATA_DIR/ledfx:/root/.ledfx
+        - /run/user/1000/pulse:/run/user/1000/pulse
 ```
 
 # Snapserver

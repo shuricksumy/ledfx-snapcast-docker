@@ -1,27 +1,24 @@
 version: '3.9'
 
 services:
-  snapclient:
-    image: your-snapcast-image:latest
+    snapclient:
+    image: ghcr.io/shuricksumy/snapcast:latest
     container_name: snapclient
-    environment:
-      - ROLE=client
-      - HOST=192.168.1.100  # Replace with Snapserver IP
-      - EXTRA_ARGS=--sound pulse --soundcard alsa_output.pci-0000_00_1b.0.analog-stereo.monitor --hostID FIIO
-      - PULSE_SERVER=unix:/run/user/1000/pulse/native
-    volumes:
-      - $XDG_RUNTIME_DIR/pulse:/run/user/1000/pulse
-      - ~/.config/pulse/cookie:/root/.config/pulse/cookie
-      - /dev/snd:/dev/snd  # Allow access to ALSA sound devices
-    devices:
-      - /dev/snd
-    network_mode: host
     restart: unless-stopped
-
-    # 🔄 To use ALSA instead of PulseAudio:
-    # environment:
-    #   - ROLE=client
-    #   - HOST=192.168.1.100
-    #   - EXTRA_ARGS=--sound alsa --soundcard default --hostID FIIO
-    #   Somwe more comlex config for DAC
-    #   - EXTRA_ARGS=--sound alsa --sampleformat 48000:24:* --soundcard plughw:CARD=Pro,DEV=0 --hostID MX3-Pro
+    devices:
+      - "/dev/snd:/dev/snd"
+    environment:
+      - UID=1000
+      - GID=1000
+      - ROLE=client
+      - HOST=192.168.88.111
+      - DEVICE_NAME=DX3 Pro
+      - SOUND_BACKEND=alsa
+      - CLIENT_ID=DX3 Pro
+      - EXTRA_ARGS=--sampleformat 48000:24:*
+    volumes:
+      - /dev/snd:/dev/snd
+      - $XDG_RUNTIME_DIR/pulse:/run/user/1000/pulse
+    networks:
+      - default
+      - npm_proxy
