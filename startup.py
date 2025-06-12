@@ -19,14 +19,16 @@ def print_aplay_devices():
         log("ERROR", f"Failed to run aplay -L: {e}")
 
 def resolve_alsa_device(device_name_hint):
-    """Search for a plughw:CARD,DEV matching the given device name hint."""
+    """Match DEVICE_NAME against description line following 'plughw:' or 'hw:'"""
     try:
         result = subprocess.run(["aplay", "-L"], capture_output=True, text=True, check=True)
         lines = result.stdout.splitlines()
-        for line in lines:
-            if device_name_hint.lower() in line.lower() and line.startswith("plughw:"):
-                log("INFO", f"Resolved device '{device_name_hint}' to: {line}")
-                return line.strip()
+        for i in range(len(lines) - 1):
+            if lines[i].startswith(("plughw:", "hw:")):
+                description = lines[i + 1].lower()
+                if device_name_hint.lower() in description:
+                    log("INFO", f"Resolved device '{device_name_hint}' to: {lines[i]}")
+                    return lines[i].strip()
     except Exception as e:
         log("ERROR", f"Failed to resolve ALSA device: {e}")
     return None
