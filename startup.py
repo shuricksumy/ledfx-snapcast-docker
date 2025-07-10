@@ -52,11 +52,32 @@ def start_server(extra_args):
         default = Path("/etc/snapserver.conf")
         config_path.write_text(default.read_text())
         log("INFO", "Copied default config to /config/")
+
     try:
         if not Path("/run/dbus").exists():
             Path("/run/dbus").mkdir(parents=True, exist_ok=True)
-        subprocess.run(["dbus-daemon", "--system"], check=True)
+
+        # Check if dbus-daemon is already running
+        result = subprocess.run(["pgrep", "dbus-daemon"], capture_output=True, text=True)
+        if result.returncode != 0:
+            pid_path = Path("/run/dbus/pid")
+            if pid_path.exists():
+                log("WARNING", "Removing stale /run/dbus/pid")
+                pid_path.unlink()
+            subprocess.run(["dbus-daemon", "--system"], check=True)
+            log("INFO", "Started dbus-daemon")
+        else:
+            log("INFO", "dbus-daemon already running")
+    except Exception as e:
+        log("ERROR", f"Error while checking/starting dbus-daemon: {e}")
+
+    try:
         subprocess.Popen(["avahi-daemon", "--no-chroot"])
+        log("INFO", "Started avahi-daemon")
+    except Exception as e:
+        log("ERROR", f"Error while starting avahi-daemon: {e}")
+
+    try:
         subprocess.run(["/usr/bin/snapserver", "-c", str(config_path)] + extra_args, check=True)
     except Exception as e:
         log("ERROR", f"Snapserver error: {e}")
