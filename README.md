@@ -61,12 +61,33 @@ services:
         - "/dev/snd:/dev/snd"  # Access to host audio devices
       environment:
         - HOST=192.168.88.111  # Static IP of Snapserver
-        - ROLE=ledfx
+        - ROLE=ledfx_client
         - PULSE_SERVER=unix:/run/user/1000/pulse/native
         - SOUND_BACKEND=alsa
         - DEVICE_NAME=Loopback
         - CLIENT_ID=LedFX
         #- EXTRA_ARGS=--sound pulse --hostID LedFX --input-device=default
+      volumes:
+        - $DATA_DIR/ledfx:/root/.ledfx
+        - /run/user/1000/pulse:/run/user/1000/pulse
+```
+# Just LedFx
+
+```docker-compose.yaml```
+```
+version: '3.9'
+
+services:
+    snapclient-ledfx:
+      image: ghcr.io/shuricksumy/snapcast:latest
+      container_name: snapclient-ledfx
+      restart: unless-stopped
+      ports:
+        - "8889:8888" # ledfx web port
+      devices:
+        - "/dev/snd:/dev/snd"  # Access to host audio devices
+      environment:
+        - ROLE=ledfx
       volumes:
         - $DATA_DIR/ledfx:/root/.ledfx
         - /run/user/1000/pulse:/run/user/1000/pulse
