@@ -19,7 +19,6 @@ def print_aplay_devices():
         log("ERROR", f"Failed to run aplay -L: {e}")
 
 def resolve_alsa_device(device_name_hint):
-    """Match DEVICE_NAME against description line following 'plughw:' or 'hw:'"""
     try:
         result = subprocess.run(["aplay", "-L"], capture_output=True, text=True, check=True)
         lines = result.stdout.splitlines()
@@ -57,7 +56,6 @@ def start_server(extra_args):
         if not Path("/run/dbus").exists():
             Path("/run/dbus").mkdir(parents=True, exist_ok=True)
 
-        # Check if dbus-daemon is already running
         result = subprocess.run(["pgrep", "dbus-daemon"], capture_output=True, text=True)
         if result.returncode != 0:
             pid_path = Path("/run/dbus/pid")
@@ -83,7 +81,7 @@ def start_server(extra_args):
         log("ERROR", f"Snapserver error: {e}")
         print_aplay_devices()
 
-def start_ledfx(host, extra_args):
+def start_ledfx_client(host, extra_args):
     log("INFO", "Starting snapclient + LedFx mode")
     def terminate(p1, p2):
         p1.terminate(); p2.terminate()
@@ -111,6 +109,17 @@ def start_ledfx(host, extra_args):
             break
         sleep(5)
 
+def start_ledfx_only():
+    log("INFO", "Starting LedFx in standalone mode")
+    try:
+        subprocess.run(
+            ["/ledfx/venv/bin/ledfx"],
+            cwd="/ledfx",
+            env={**os.environ, "VIRTUAL_ENV": "/ledfx/venv", "PATH": f"/ledfx/venv/bin:{os.environ['PATH']}"}
+        )
+    except Exception as e:
+        log("ERROR", f"LedFx failed to start: {e}")
+
 def main():
     role = os.getenv("ROLE", "server").lower()
     host = os.getenv("HOST", "localhost")
@@ -122,7 +131,7 @@ def main():
 
     print_aplay_devices()
 
-    if role in ("client", "ledfx"):
+    if role in ("client", "ledfx_client"):
         backend = None
 
         if sound_backend in ("alsa", "pulse"):
@@ -158,8 +167,10 @@ def main():
         start_server(extra_args)
     elif role == "client":
         start_snapclient(host, extra_args)
+    elif role == "ledfx_client":
+        start_ledfx_client(host, extra_args)
     elif role == "ledfx":
-        start_ledfx(host, extra_args)
+        start_ledfx_only()
     else:
         log("ERROR", f"Invalid ROLE: {role}")
         sys.exit(1)
