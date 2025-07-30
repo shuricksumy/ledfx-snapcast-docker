@@ -17,6 +17,8 @@ services:
       - $DATA_DIR/ledfx:/root/.ledfx
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+    depends_on:
+      - squeezelite-ledfx
 
   squeezelite-ledfx:
     image: giof71/squeezelite

@@ -146,6 +146,8 @@ services:
       - "8888:8888"
     devices:
       - "/dev/snd:/dev/snd"
+    depends_on:
+      - squeezelite-ledfx
     environment:
       - ROLE=ledfx
       - SOUND_BACKEND=loopback
@@ -182,42 +184,32 @@ services:
 
 ## 🧠 Loopback Device Setup
 
-If you’re deploying with docker-compose, you can write a small systemd unit to run modprobe before Docker:
-
-```ini
-# /etc/systemd/system/aloop-init.service
-[Unit]
-Description=Load snd-aloop module
-Before=docker.service
-
-[Service]
-Type=oneshot
-ExecStart=/sbin/modprobe snd-aloop index=10,11
-RemainAfterExit=true
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Then enable it:
-
-```bash
-sudo systemctl enable --now aloop-init.service
-```
-
-## OR
-
 To use the loopback audio device with Snapclient + LedFx or Squeezelite:
 
-1. Create file `/etc/modules-load.d/ledfx.conf`:
+1. Create the config file: `sudo nano /etc/modprobe.d/loopback.conf`:
 
 ```bash
-# /etc/modules-load.d/ledfx.conf
-snd-aloop index=10
+# sudo nano /etc/modprobe.d/loopback.conf
+options snd-aloop index=10
+# options snd-aloop enable=1,1 index=10,11
 ```
 
-2. Load the module (or reboot):
+2. Create the file: `sudo nano /etc/modules-load.d/ledfx.conf`:
 
 ```bash
-sudo modprobe snd-aloop index=10
+# sudo nano /etc/modules-load.d/ledfx.conf
+snd-aloop
+```
+
+3. Load the module (or reboot):
+
+```bash
+sudo modprobe -r snd-aloop
+sudo modprobe snd-aloop
+```
+
+4. Confirm it’s loaded:
+
+```bash
+aplay -L | grep -A 1 Loopback
 ```
