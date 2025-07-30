@@ -12,6 +12,7 @@ services:
     environment:
       - ROLE=ledfx
       - SOUND_BACKEND=loopback
+      - LOOPBACK_INDEX=10
     volumes:
       - $DATA_DIR/ledfx:/root/.ledfx
     labels:
