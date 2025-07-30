@@ -145,12 +145,9 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /
 RUN mkdir /config
 COPY snapserver.conf /etc/snapserver.conf
-COPY startup.sh startup.sh
 COPY startup.py startup.py
-RUN chmod +x /startup.sh
 RUN chmod +x /startup.py
 EXPOSE 1704 1705 1780 8888
-# ENTRYPOINT [ "/startup.sh" ]
 ENTRYPOINT ["python3",  "-u", "/startup.py"]
 
 
