@@ -1,11 +1,38 @@
+
 # Docker builder for [Snapcast](https://github.com/badaix/snapcast) and [LedFX](https://github.com/LedFx/LedFx)
 
-# Snapclient
+---
 
-```docker-compose.yaml```
-```
+## ✅ Supported Roles
+
+- `server`: Runs Snapserver  
+- `client`: Runs Snapclient  
+- `ledfx_client`: Runs Snapclient + LedFx  
+- `ledfx`: Runs only LedFx  
+
+---
+
+## 🔧 Environment Variables
+
+| Variable         | Description                                                |
+|------------------|------------------------------------------------------------|
+| `ROLE`           | `server`, `client`, `ledfx`, or `ledfx_client`             |
+| `HOST`           | IP/hostname of Snapserver                                  |
+| `SOUND_BACKEND`  | `alsa`, `pulse`, or `loopback`                             |
+| `DEVICE_NAME`    | ALSA device name (matched using `aplay -L`)               |
+| `CLIENT_ID`      | Optional name for Snapclient instance                      |
+| `EXTRA_ARGS`     | Additional parameters passed to snapclient                 |
+| `LOOPBACK_INDEX` | Required if `SOUND_BACKEND=loopback` (e.g., `10`)          |
+
+
+---
+
+## 🔊 Snapclient with ALSA
+
+```yaml
 version: '3.9'
 
+services:
   snapclient:
     image: ghcr.io/shuricksumy/snapcast:latest
     container_name: snapclient
@@ -17,97 +44,179 @@ version: '3.9'
       - GID=1000
       - ROLE=client
       - HOST=192.168.88.111
-      - DEVICE_NAME=DX3 Pro
       - SOUND_BACKEND=alsa
+      - DEVICE_NAME=DX3 Pro
       - CLIENT_ID=DX3 Pro
       - EXTRA_ARGS=--sampleformat 48000:24:*
     volumes:
       - /dev/snd:/dev/snd
       - $XDG_RUNTIME_DIR/pulse:/run/user/1000/pulse
-    networks:
-      - default
-      - npm_proxy
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
 ```
 
-# LedFX
-### Need to run ```sudo modprobe snd-aloop``` to add Loopback device
+---
 
-- Add file ```ledfx.conf``` to ```/etc/modules-load.d/``` on host machine
-```ledfx.conf```
-```
-# add loop snd card to use it as input for ledfx
-snd-aloop
-```
-- Reboot host machine or just run ```sudo modprobe snd-aloop```
-- Start docker container
-- Select device ```Loopback``` in ledfx UI setting. 
-- Can be first or second device - just try what is the proper (for me, the second works).
-  
-![image](https://github.com/user-attachments/assets/23bc92e0-c878-4807-9fa6-0597fbae3fe6)
+## 🎛 Snapclient + LedFx (Loopback)
 
-
-```docker-compose.yaml```
-```
+```yaml
 version: '3.9'
 
 services:
-    snapclient-ledfx:
-      image: ghcr.io/shuricksumy/snapcast:latest
-      container_name: snapclient-ledfx
-      restart: unless-stopped
-      ports:
-        - "8889:8888" # ledfx web port
-      devices:
-        - "/dev/snd:/dev/snd"  # Access to host audio devices
-      environment:
-        - HOST=192.168.88.111  # Static IP of Snapserver
-        - ROLE=ledfx_client
-        - PULSE_SERVER=unix:/run/user/1000/pulse/native
-        - SOUND_BACKEND=alsa
-        - DEVICE_NAME=Loopback
-        - CLIENT_ID=LedFX
-        #- EXTRA_ARGS=--sound pulse --hostID LedFX --input-device=default
-      volumes:
-        - $DATA_DIR/ledfx:/root/.ledfx
-        - /run/user/1000/pulse:/run/user/1000/pulse
+  snapclient-ledfx:
+    image: ghcr.io/shuricksumy/snapcast:latest
+    container_name: snapclient-ledfx
+    restart: unless-stopped
+    ports:
+      - "8888:8888"
+    devices:
+      - "/dev/snd:/dev/snd"
+    environment:
+      - ROLE=ledfx_client
+      - HOST=192.168.88.111
+      - SOUND_BACKEND=loopback
+      - LOOPBACK_INDEX=10
+      - CLIENT_ID=LedFX
+      - EXTRA_ARGS=--sampleformat 48000:24:*
+    volumes:
+      - $DATA_DIR/ledfx:/root/.ledfx
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
 ```
-# Just LedFx
 
-```docker-compose.yaml```
-```
+---
+
+## 🌈 LedFx Only
+
+```yaml
 version: '3.9'
 
 services:
-    snapclient-ledfx:
-      image: ghcr.io/shuricksumy/snapcast:latest
-      container_name: snapclient-ledfx
-      restart: unless-stopped
-      ports:
-        - "8889:8888" # ledfx web port
-      devices:
-        - "/dev/snd:/dev/snd"  # Access to host audio devices
-      environment:
-        - ROLE=ledfx
-      volumes:
-        - $DATA_DIR/ledfx:/root/.ledfx
-        - /run/user/1000/pulse:/run/user/1000/pulse
+  ledfx:
+    image: ghcr.io/shuricksumy/snapcast:latest
+    container_name: ledfx
+    restart: unless-stopped
+    ports:
+      - "8889:8888"
+    devices:
+      - "/dev/snd:/dev/snd"
+    environment:
+      - ROLE=ledfx
+    volumes:
+      - $DATA_DIR/ledfx:/root/.ledfx
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
 ```
 
-# Snapserver
+---
 
-```docker-compose.yaml```
-```
+## 📡 Snapserver
+
+```yaml
 version: '3.9'
+
 services:
   snapserver:
-    image: dc8ca81f78b9
+    image: ghcr.io/shuricksumy/snapcast:latest
     container_name: snapserver
+    restart: unless-stopped
     environment:
       - ROLE=server
-    #  - EXTRA_ARGS=
     volumes:
       - ${DATA_DIR}/snapcast:/tmp/snapcast
       - ${DATA_DIR}/snapserver/config:/config
     network_mode: host
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+```
+
+---
+
+## 🎶 LedFx + Squeezelite with Loopback
+
+```yaml
+version: '3.9'
+
+services:
+  ledfx:
+    image: ghcr.io/shuricksumy/snapcast:latest
+    container_name: ledfx
     restart: unless-stopped
+    ports:
+      - "8888:8888"
+    devices:
+      - "/dev/snd:/dev/snd"
+    environment:
+      - ROLE=ledfx
+      - SOUND_BACKEND=loopback
+    volumes:
+      - $DATA_DIR/ledfx:/root/.ledfx
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  squeezelite-ledfx:
+    image: giof71/squeezelite
+    container_name: squeezelite-ledfx
+    devices:
+      - /dev/snd:/dev/snd
+    network_mode: host
+    environment:
+      - SQUEEZELITE_NAME=LedFx
+      - SQUEEZELITE_AUDIO_DEVICE=hw:CARD=Loopback,DEV=0
+      - SQUEEZELITE_SERVER_PORT=192.168.88.111:3483
+      - SQUEEZELITE_RATES=44100
+      - STARTUP_DELAY_SEC=0
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+```
+
+---
+
+## ✅ Tips
+
+- For `loopback` backend, ensure kernel module `snd-aloop` is loaded and `LOOPBACK_INDEX` matches index.
+- Use `aplay -L` to find and verify available ALSA devices.
+- In LedFx settings, select `Loopback` as audio input device.
+
+## 🧠 Loopback Device Setup
+
+If you’re deploying with docker-compose, you can write a small systemd unit to run modprobe before Docker:
+
+```ini
+# /etc/systemd/system/aloop-init.service
+[Unit]
+Description=Load snd-aloop module
+Before=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/modprobe snd-aloop index=10,11
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then enable it:
+
+```bash
+sudo systemctl enable --now aloop-init.service
+```
+
+## OR
+
+To use the loopback audio device with Snapclient + LedFx or Squeezelite:
+
+1. Create file `/etc/modules-load.d/ledfx.conf`:
+
+```bash
+# /etc/modules-load.d/ledfx.conf
+snd-aloop index=10
+```
+
+2. Load the module (or reboot):
+
+```bash
+sudo modprobe snd-aloop index=10
 ```
