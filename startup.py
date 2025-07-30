@@ -36,6 +36,27 @@ def auto_detect_backend():
     pulse_socket = Path(os.getenv("PULSE_SERVER", "/run/user/1000/pulse/native"))
     return "pulse" if pulse_socket.exists() else "alsa"
 
+def ensure_loopback(index=10):
+    """Ensure ALSA loopback device is loaded"""
+    try:
+        output = subprocess.check_output(["aplay", "-l"], text=True)
+        if "Loopback" in output:
+            log("INFO", "Loopback device already present")
+            return True
+        log("INFO", f"Loading snd-aloop module with index={index}")
+        subprocess.run(["modprobe", "snd-aloop", f"index={index}"], check=True)
+        sleep(2)
+        output = subprocess.check_output(["aplay", "-l"], text=True)
+        if "Loopback" in output:
+            log("INFO", "Loopback device loaded successfully")
+            return True
+        else:
+            log("ERROR", "Loopback device still missing after modprobe")
+            return False
+    except Exception as e:
+        log("ERROR", f"Loopback check failed: {e}")
+        return False
+
 def start_snapclient(host, extra_args):
     log("INFO", f"Starting snapclient for host {host} with args: {' '.join(extra_args)}")
     try:
@@ -125,21 +146,24 @@ def main():
     host = os.getenv("HOST", "localhost")
     device_hint = os.getenv("DEVICE_NAME")
     sound_backend = os.getenv("SOUND_BACKEND", "").lower()
+    loopback_index = int(os.getenv("LOOPBACK_INDEX", "10"))
     client_id = os.getenv("CLIENT_ID")
     extra_args_env = os.getenv("EXTRA_ARGS", "")
     extra_args = extra_args_env.split() if extra_args_env else []
 
     print_aplay_devices()
 
-    if role in ("client", "ledfx_client"):
-        backend = None
+    if sound_backend == "loopback":
+        log("INFO", f"SOUND_BACKEND set to 'loopback', checking device at index {loopback_index}")
+        if not ensure_loopback(loopback_index):
+            log("FATAL", "Loopback backend selected, but loopback device is unavailable. Exiting.")
+            sys.exit(1)
+        extra_args.append(f"--sound=alsa")
+        extra_args.append(f"--soundcard=plughw:{loopback_index},0")
 
-        if sound_backend in ("alsa", "pulse"):
-            backend = sound_backend
-            log("INFO", f"Using SOUND_BACKEND override: {backend}")
-        else:
-            backend = auto_detect_backend()
-            log("INFO", f"Auto-detected audio backend: {backend}")
+    elif role in ("client", "ledfx_client"):
+        backend = sound_backend if sound_backend in ("alsa", "pulse") else auto_detect_backend()
+        log("INFO", f"Using SOUND_BACKEND: {backend}")
 
         soundcard = None
         if not any(arg.startswith("--soundcard") for arg in extra_args):
@@ -154,14 +178,14 @@ def main():
         if soundcard and not any(arg.startswith("--soundcard=") for arg in extra_args):
             extra_args.append(f"--soundcard={soundcard}")
 
-        if not any(arg.startswith("--hostID=") for arg in extra_args):
-            if client_id:
-                extra_args.append(f"--hostID={client_id}")
-                log("INFO", f"Using CLIENT_ID override: {client_id}")
-            else:
-                extra_args.append("--hostID=AutoClient")
+    if not any(arg.startswith("--hostID=") for arg in extra_args):
+        if client_id:
+            extra_args.append(f"--hostID={client_id}")
+            log("INFO", f"Using CLIENT_ID override: {client_id}")
+        else:
+            extra_args.append("--hostID=AutoClient")
 
-        log("INFO", f"Final EXTRA_ARGS: {' '.join(extra_args)}")
+    log("INFO", f"Final EXTRA_ARGS: {' '.join(extra_args)}")
 
     if role == "server":
         start_server(extra_args)

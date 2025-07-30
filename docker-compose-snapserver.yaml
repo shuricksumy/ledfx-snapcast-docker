@@ -1,13 +1,15 @@
 version: '3.9'
+
 services:
   snapserver:
-    image: dc8ca81f78b9
+    image: ghcr.io/shuricksumy/snapcast:latest
     container_name: snapserver
+    restart: unless-stopped
     environment:
       - ROLE=server
-    #  - EXTRA_ARGS=
     volumes:
       - ${DATA_DIR}/snapcast:/tmp/snapcast
       - ${DATA_DIR}/snapserver/config:/config
     network_mode: host
-    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"

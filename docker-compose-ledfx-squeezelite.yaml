@@ -1,0 +1,34 @@
+version: '3.9'
+
+services:
+  ledfx:
+    image: ghcr.io/shuricksumy/snapcast:latest
+    container_name: ledfx
+    restart: unless-stopped
+    ports:
+      - "8888:8888"
+    devices:
+      - "/dev/snd:/dev/snd"
+    environment:
+      - ROLE=ledfx
+      - SOUND_BACKEND=loopback
+    volumes:
+      - $DATA_DIR/ledfx:/root/.ledfx
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  squeezelite-ledfx:
+    image: giof71/squeezelite
+    container_name: squeezelite-ledfx
+    devices:
+      - /dev/snd:/dev/snd
+    network_mode: host
+    environment:
+      - SQUEEZELITE_NAME=LedFx
+      - SQUEEZELITE_AUDIO_DEVICE=hw:CARD=Loopback,DEV=0
+      - SQUEEZELITE_SERVER_PORT=192.168.88.111:3483
+      - SQUEEZELITE_RATES=44100
+      - STARTUP_DELAY_SEC=0
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"

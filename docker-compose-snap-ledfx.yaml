@@ -1,0 +1,21 @@
+version: '3.9'
+
+services:
+    snapclient-ledfx:
+      image: ghcr.io/shuricksumy/snapcast:latest
+      container_name: snapclient-ledfx
+      restart: unless-stopped
+      ports:
+        - "8888:8888"
+      devices:
+        - "/dev/snd:/dev/snd"
+      environment:
+        - ROLE=ledfx_client
+        - HOST=192.168.88.111
+        - SOUND_BACKEND=loopback
+        - LOOPBACK_INDEX=10
+        - CLIENT_ID=LedFX
+      volumes:
+        - $DATA_DIR/ledfx:/root/.ledfx
+      labels:
+        - "com.centurylinklabs.watchtower.enable=true"
