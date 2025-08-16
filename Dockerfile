@@ -110,19 +110,19 @@ ARG ARCH
 RUN if [ -z "$ARCH" ]; then ARCH=$(dpkg --print-architecture); fi && echo "Architecture: $ARCH"
 
 # Set package paths based on architecture
-COPY pkg/snapclient_0.32.2-1_amd64_bookworm.deb             /tmp/pkg/snapclient_0.32.2-1_amd64_bookworm.deb
-COPY pkg/snapclient_0.32.2-1_arm64_bookworm.deb             /tmp/pkg/snapclient_0.32.2-1_arm64_bookworm.deb
-COPY pkg/snapserver_0.32.2-1_amd64_bookworm.deb             /tmp/pkg/snapserver_0.32.2-1_amd64_bookworm.deb
-COPY pkg/snapclient_0.32.2-1_amd64_bookworm_with-pulse.deb  /tmp/pkg/snapclient_0.32.2-1_amd64_bookworm_with-pulse.deb
-COPY pkg/snapclient_0.32.2-1_arm64_bookworm_with-pulse.deb  /tmp/pkg/snapclient_0.32.2-1_arm64_bookworm_with-pulse.deb
-COPY pkg/snapserver_0.32.2-1_arm64_bookworm.deb             /tmp/pkg/snapserver_0.32.2-1_arm64_bookworm.deb
+COPY pkg/snapclient_0.32.3-1_amd64_bookworm.deb             /tmp/pkg/snapclient_0.32.3-1_amd64_bookworm.deb
+COPY pkg/snapclient_0.32.3-1_arm64_bookworm.deb             /tmp/pkg/snapclient_0.32.3-1_arm64_bookworm.deb
+COPY pkg/snapserver_0.32.3-1_amd64_bookworm.deb             /tmp/pkg/snapserver_0.32.3-1_amd64_bookworm.deb
+COPY pkg/snapclient_0.32.3-1_amd64_bookworm_with-pulse.deb  /tmp/pkg/snapclient_0.32.3-1_amd64_bookworm_with-pulse.deb
+COPY pkg/snapclient_0.32.3-1_arm64_bookworm_with-pulse.deb  /tmp/pkg/snapclient_0.32.3-1_arm64_bookworm_with-pulse.deb
+COPY pkg/snapserver_0.32.3-1_arm64_bookworm.deb             /tmp/pkg/snapserver_0.32.3-1_arm64_bookworm.deb
 
 RUN if [ "$(dpkg --print-architecture)" = "arm64" ]; then \
-        apt-get install -y /tmp/pkg/snapclient_0.32.2-1_arm64_bookworm_with-pulse.deb; \
-        apt-get install -y /tmp/pkg/snapserver_0.32.2-1_arm64_bookworm.deb; \
+        apt-get install -y /tmp/pkg/snapclient_0.32.3-1_arm64_bookworm_with-pulse.deb; \
+        apt-get install -y /tmp/pkg/snapserver_0.32.3-1_arm64_bookworm.deb; \
     elif [ "$(dpkg --print-architecture)" = "amd64" ]; then \
-        apt-get install -y /tmp/pkg/snapclient_0.32.2-1_amd64_bookworm_with-pulse.deb; \
-        apt-get install -y /tmp/pkg/snapserver_0.32.2-1_amd64_bookworm.deb; \
+        apt-get install -y /tmp/pkg/snapclient_0.32.3-1_amd64_bookworm_with-pulse.deb; \
+        apt-get install -y /tmp/pkg/snapserver_0.32.3-1_amd64_bookworm.deb; \
     else \
         echo "Unsupported architecture"; exit 1; \
     fi
