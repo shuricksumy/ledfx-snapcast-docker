@@ -50,7 +50,6 @@ services:
       - EXTRA_ARGS=--sampleformat 48000:24:*
     volumes:
       - /dev/snd:/dev/snd
-      - $XDG_RUNTIME_DIR/pulse:/run/user/1000/pulse
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 ```
@@ -167,7 +166,6 @@ services:
       - SQUEEZELITE_NAME=LedFx
       - SQUEEZELITE_AUDIO_DEVICE=hw:CARD=Loopback,DEV=0
       - SQUEEZELITE_SERVER_PORT=192.168.88.111:3483
-      - SQUEEZELITE_RATES=44100
       - STARTUP_DELAY_SEC=0
     restart: unless-stopped
     labels:
