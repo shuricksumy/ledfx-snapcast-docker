@@ -18,8 +18,8 @@
 |------------------|------------------------------------------------------------|
 | `ROLE`           | `server`, `client`, `ledfx`, or `ledfx_client`             |
 | `HOST`           | IP/hostname of Snapserver                                  |
-| `SOUND_BACKEND`  | `alsa`, `pulse`, or `loopback`                             |
-| `DEVICE_NAME`    | ALSA device name (matched using `aplay -L`)               |
+| `SOUND_BACKEND`  | `alsa` or `loopback`.                                      |
+| `DEVICE_NAME`    | ALSA device name (matched using `aplay -L`)                |
 | `CLIENT_ID`      | Optional name for Snapclient instance                      |
 | `EXTRA_ARGS`     | Additional parameters passed to snapclient                 |
 | `LOOPBACK_INDEX` | Required if `SOUND_BACKEND=loopback` (e.g., `10`)          |
