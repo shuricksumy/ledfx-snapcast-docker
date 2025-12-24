@@ -1,28 +1,32 @@
 # --- Stage 1: Builder ---
 FROM debian:trixie-slim AS builder
 
-# We need these extra -dev packages so python-rtmidi can compile
+# We need ALL audio development headers for python-rtmidi to compile on Trixie
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-venv \
+    python3-dev \
     python3-numpy \
     build-essential \
     pkg-config \
     libasound2-dev \
     libjack-dev \
+    portaudio19-dev \
+    libportaudio2 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /ledfx
 RUN python3 -m venv /ledfx/venv
 
-# Install build tools first, then LedFx
+# Force update of build tools and install LedFx
 RUN /ledfx/venv/bin/pip install --no-cache-dir --upgrade pip wheel setuptools
+# Separating rtmidi can sometimes help debug, but we'll bundle it here
 RUN /ledfx/venv/bin/pip install --no-cache-dir sounddevice ledfx
 
 # --- Stage 2: Final ---
 FROM debian:trixie-slim
 
-# Install system dependencies using generic names to avoid version mismatches
+# System dependencies (Using -dev for flac/vorbis to avoid the naming confusion)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     alsa-utils \
     dbus-daemon \
@@ -43,16 +47,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ARG TARGETARCH
 RUN if [ -z "$TARGETARCH" ]; then TARGETARCH=$(dpkg --print-architecture); fi
 
-# Copy and Install Snapcast from your local pkg folder
-COPY pkg/snapclient_*_${TARGETARCH}_*pipewire.deb /tmp/snapclient.deb
-COPY pkg/snapserver_*_${TARGETARCH}_*pipewire.deb /tmp/snapserver.deb
+# Copy and Install Snapcast
+COPY pkg/snapclient_*_${TARGETARCH}_*.deb /tmp/snapclient.deb
+COPY pkg/snapserver_*_${TARGETARCH}_*.deb /tmp/snapserver.deb
 
 RUN apt-get update && \
     (apt-get install -y /tmp/snapclient.deb /tmp/snapserver.deb || apt-get install -y -f) && \
     rm /tmp/*.deb && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy the working virtualenv from builder
+# Copy Venv
 COPY --from=builder /ledfx/venv /ledfx/venv
 
 ENV PATH="/ledfx/venv/bin:$PATH"
