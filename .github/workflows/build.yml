@@ -66,10 +66,15 @@ jobs:
             ghcr.io/${{ github.repository }}
             shuricksumy/snapcast
           tags: |
-            type=raw,value=latest,enable=${{ github.event_name == 'push' || github.event.inputs.action == 'push-main' }}
-            type=ref,event=release
+            # Tag as 'latest' if we are on the main branch
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Tag with the Git Tag if this is a Release or a Tag push
+            type=ref,event=tag
+            # Tag with the specific input tag if manually triggered as a release
             type=raw,value=${{ github.event.inputs.tag_name }},enable=${{ github.event.inputs.action == 'release' }}
-
+            # Tag with SHA for unique identification (good practice)
+            type=sha,format=short
+            
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v6
         with:
