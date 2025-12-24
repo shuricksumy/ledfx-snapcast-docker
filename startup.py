@@ -20,7 +20,6 @@ def print_aplay_devices():
         log("ERROR", f"aplay -L failed: {e}")
 
 def resolve_alsa_device(device_name_hint: str | None) -> str | None:
-    """Find an ALSA hw/plughw device matching the given name hint."""
     if not device_name_hint:
         return None
     try:
@@ -38,7 +37,6 @@ def resolve_alsa_device(device_name_hint: str | None) -> str | None:
     return None
 
 def ensure_loopback(index=10) -> bool:
-    """Load snd-aloop for loopback playback/monitoring."""
     try:
         out = subprocess.check_output(["aplay", "-l"], text=True)
         if "Loopback" in out:
@@ -57,13 +55,23 @@ def ensure_loopback(index=10) -> bool:
 
 # ------------------------ runner helpers ------------------------
 def build_player_arg(opts: str | None) -> list[str]:
+    """
+    NEW SYNTAX: -p alsa:device=hw:1,0
+    Old syntax was --sound alsa
+    """
+    # If opts contains 'device=', it's already a full parameter string
+    # Snapclient expects: -p <player>[:<options>]
     arg = "alsa" if not opts else f"alsa:{opts}"
-    return ["--player", arg]
+    return ["-p", arg]  # Using short flag -p which is most compatible
 
 def start_snapclient(host: str, args: list[str]):
-    log("INFO", f"Starting snapclient for {host} with args: {' '.join(args)}")
+    # Clean up args: Ensure no old '--sound' flags exist in extra_args
+    clean_args = [a for a in args if not a.startswith("--sound")]
+    
+    log("INFO", f"Starting snapclient for {host} with args: {' '.join(clean_args)}")
     try:
-        subprocess.run(["/usr/bin/snapclient", "-h", host] + args, check=True)
+        # Snapclient v0.27+ uses -h for host and -p for player
+        subprocess.run(["/usr/bin/snapclient", "-h", host] + clean_args, check=True)
     except subprocess.CalledProcessError as e:
         log("ERROR", f"snapclient exited with code {e.returncode}")
         print_aplay_devices()
@@ -73,15 +81,17 @@ def start_server(args: list[str]):
     cfg = Path("/config/snapserver.conf")
     if not cfg.exists():
         default = Path("/etc/snapserver.conf")
-        cfg.write_text(default.read_text())
-        log("INFO", "Copied default snapserver.conf to /config")
+        if default.exists():
+            cfg.write_text(default.read_text())
+            log("INFO", "Copied default snapserver.conf to /config")
+        else:
+            cfg.touch() # Create empty if default doesn't exist
 
     try:
         Path("/run/dbus").mkdir(parents=True, exist_ok=True)
         if subprocess.run(["pgrep", "dbus-daemon"], capture_output=True).returncode != 0:
             pid_path = Path("/run/dbus/pid")
-            if pid_path.exists():
-                pid_path.unlink(missing_ok=True)
+            pid_path.unlink(missing_ok=True)
             subprocess.run(["dbus-daemon", "--system"], check=True)
             log("INFO", "dbus-daemon started")
     except Exception as e:
@@ -100,24 +110,23 @@ def start_server(args: list[str]):
 
 # ------------------------ main ------------------------
 def main():
-    role = os.getenv("ROLE", "server").lower()            # server | client
+    role = os.getenv("ROLE", "server").lower()
     host = os.getenv("HOST", "localhost")
-    client_id = os.getenv("CLIENT_ID")                    # --hostID value
-    device_hint = os.getenv("DEVICE_NAME")                # e.g. "usb dac"
-    loopback = os.getenv("LOOPBACK", "0") == "1"          # set to 1 to use snd-aloop
+    client_id = os.getenv("CLIENT_ID")
+    device_hint = os.getenv("DEVICE_NAME")
+    loopback = os.getenv("LOOPBACK", "0") == "1"
     loopback_index = int(os.getenv("LOOPBACK_INDEX", "10"))
 
-    # ALSA player options (example: buffer_time=100,fragments=4,device=plughw:1,0)
     player_opts = (os.getenv("PLAYER_OPTIONS") or "").strip()
-    extra_args = (os.getenv("EXTRA_ARGS") or "").split()
+    
+    # Split extra_args carefully and filter out the problematic --sound flag
+    raw_extra = (os.getenv("EXTRA_ARGS") or "").split()
+    extra_args = [a for a in raw_extra if not a.startswith("--sound")]
 
-    print_aplay_devices()
-
-    # Loopback mode
     if loopback:
         if ensure_loopback(loopback_index):
             if "device=" not in player_opts:
-                player_opts = (player_opts + "," if player_opts else "") + f"device=plughw:{loopback_index},0"
+                player_opts = (f"device=plughw:{loopback_index},0" + (f",{player_opts}" if player_opts else ""))
         else:
             log("FATAL", "LOOPBACK=1 but snd-aloop unavailable")
             sys.exit(1)
@@ -125,15 +134,13 @@ def main():
         if device_hint and "device=" not in player_opts:
             resolved = resolve_alsa_device(device_hint)
             if resolved:
-                player_opts = (player_opts + "," if player_opts else "") + f"device={resolved}"
+                player_opts = (f"device={resolved}" + (f",{player_opts}" if player_opts else ""))
 
     player_arg = build_player_arg(player_opts)
 
     if client_id and role == "client":
+        # Check if user provided hostID with one or two dashes
         extra_args.append(f"--hostID={client_id}")
-
-    log("INFO", f"ALSA player options: {player_opts}")
-    log("INFO", f"Final args: {' '.join(player_arg + extra_args)}")
 
     if role == "server":
         start_server(extra_args)
