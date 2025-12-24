@@ -1,202 +1,146 @@
 #!/usr/bin/env python3
-
 import os
 import sys
 import subprocess
 from pathlib import Path
 from time import sleep
 
+# ------------------------ logging ------------------------
 def log(level, msg):
     from datetime import datetime
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [{level}]  ➡️  {msg}", flush=True)
 
+# ------------------------ ALSA helpers ------------------------
 def print_aplay_devices():
-    log("INFO", "🔊 Available ALSA Devices (aplay -L):")
+    log("INFO", "🔊 ALSA devices (aplay -L):")
     try:
-        result = subprocess.run(["aplay", "-L"], capture_output=True, text=True, check=True)
-        print(result.stdout)
-    except subprocess.CalledProcessError as e:
-        log("ERROR", f"Failed to run aplay -L: {e}")
+        out = subprocess.run(["aplay", "-L"], capture_output=True, text=True, check=True).stdout
+        print(out)
+    except Exception as e:
+        log("ERROR", f"aplay -L failed: {e}")
 
-def resolve_alsa_device(device_name_hint):
+def resolve_alsa_device(device_name_hint: str | None) -> str | None:
+    """Find an ALSA hw/plughw device matching the given name hint."""
+    if not device_name_hint:
+        return None
     try:
-        result = subprocess.run(["aplay", "-L"], capture_output=True, text=True, check=True)
-        lines = result.stdout.splitlines()
+        out = subprocess.run(["aplay", "-L"], capture_output=True, text=True, check=True).stdout
+        lines = out.splitlines()
         for i in range(len(lines) - 1):
             if lines[i].startswith(("plughw:", "hw:")):
-                description = lines[i + 1].lower()
-                if device_name_hint.lower() in description:
-                    log("INFO", f"Resolved device '{device_name_hint}' to: {lines[i]}")
-                    return lines[i].strip()
+                desc = lines[i + 1].lower()
+                if device_name_hint.lower() in desc:
+                    cand = lines[i].strip()
+                    log("INFO", f"Resolved '{device_name_hint}' -> {cand}")
+                    return cand
     except Exception as e:
-        log("ERROR", f"Failed to resolve ALSA device: {e}")
+        log("ERROR", f"Device resolve failed: {e}")
     return None
 
-def auto_detect_backend():
-    pulse_socket = Path(os.getenv("PULSE_SERVER", "/run/user/1000/pulse/native"))
-    return "pulse" if pulse_socket.exists() else "alsa"
-
-def ensure_loopback(index=10):
-    """Ensure ALSA loopback device is loaded"""
+def ensure_loopback(index=10) -> bool:
+    """Load snd-aloop for loopback playback/monitoring."""
     try:
-        output = subprocess.check_output(["aplay", "-l"], text=True)
-        if "Loopback" in output:
-            log("INFO", "Loopback device already present")
+        out = subprocess.check_output(["aplay", "-l"], text=True)
+        if "Loopback" in out:
+            log("INFO", "Loopback already present")
             return True
-        log("INFO", f"Loading snd-aloop module with index={index}")
+        log("INFO", f"Loading snd-aloop index={index}")
         subprocess.run(["modprobe", "snd-aloop", f"index={index}"], check=True)
-        sleep(2)
-        output = subprocess.check_output(["aplay", "-l"], text=True)
-        if "Loopback" in output:
-            log("INFO", "Loopback device loaded successfully")
-            return True
-        else:
-            log("ERROR", "Loopback device still missing after modprobe")
-            return False
+        sleep(1.5)
+        out = subprocess.check_output(["aplay", "-l"], text=True)
+        ok = "Loopback" in out
+        log("INFO" if ok else "ERROR", "Loopback ready" if ok else "Loopback missing")
+        return ok
     except Exception as e:
-        log("ERROR", f"Loopback check failed: {e}")
+        log("ERROR", f"Loopback setup failed: {e}")
         return False
 
-def start_snapclient(host, extra_args):
-    log("INFO", f"Starting snapclient for host {host} with args: {' '.join(extra_args)}")
+# ------------------------ runner helpers ------------------------
+def build_player_arg(opts: str | None) -> list[str]:
+    arg = "alsa" if not opts else f"alsa:{opts}"
+    return ["--player", arg]
+
+def start_snapclient(host: str, args: list[str]):
+    log("INFO", f"Starting snapclient for {host} with args: {' '.join(args)}")
     try:
-        subprocess.run(["/usr/bin/snapclient", "-h", host] + extra_args, check=True)
+        subprocess.run(["/usr/bin/snapclient", "-h", host] + args, check=True)
     except subprocess.CalledProcessError as e:
-        log("ERROR", f"Snapclient failed to start: {e}")
+        log("ERROR", f"snapclient exited with code {e.returncode}")
         print_aplay_devices()
 
-def start_server(extra_args):
-    log("INFO", "Starting Snapserver (server mode)")
-    config_path = Path("/config/snapserver.conf")
-    if not config_path.exists():
+def start_server(args: list[str]):
+    log("INFO", "Starting snapserver (server mode)")
+    cfg = Path("/config/snapserver.conf")
+    if not cfg.exists():
         default = Path("/etc/snapserver.conf")
-        config_path.write_text(default.read_text())
-        log("INFO", "Copied default config to /config/")
+        cfg.write_text(default.read_text())
+        log("INFO", "Copied default snapserver.conf to /config")
 
     try:
-        if not Path("/run/dbus").exists():
-            Path("/run/dbus").mkdir(parents=True, exist_ok=True)
-
-        result = subprocess.run(["pgrep", "dbus-daemon"], capture_output=True, text=True)
-        if result.returncode != 0:
+        Path("/run/dbus").mkdir(parents=True, exist_ok=True)
+        if subprocess.run(["pgrep", "dbus-daemon"], capture_output=True).returncode != 0:
             pid_path = Path("/run/dbus/pid")
             if pid_path.exists():
-                log("WARNING", "Removing stale /run/dbus/pid")
-                pid_path.unlink()
+                pid_path.unlink(missing_ok=True)
             subprocess.run(["dbus-daemon", "--system"], check=True)
-            log("INFO", "Started dbus-daemon")
-        else:
-            log("INFO", "dbus-daemon already running")
+            log("INFO", "dbus-daemon started")
     except Exception as e:
-        log("ERROR", f"Error while checking/starting dbus-daemon: {e}")
+        log("WARNING", f"dbus setup issue: {e}")
 
     try:
         subprocess.Popen(["avahi-daemon", "--no-chroot"])
-        log("INFO", "Started avahi-daemon")
+        log("INFO", "avahi-daemon started")
     except Exception as e:
-        log("ERROR", f"Error while starting avahi-daemon: {e}")
+        log("WARNING", f"avahi start issue: {e}")
 
     try:
-        subprocess.run(["/usr/bin/snapserver", "-c", str(config_path)] + extra_args, check=True)
+        subprocess.run(["/usr/bin/snapserver", "-c", str(cfg)] + args, check=True)
     except Exception as e:
-        log("ERROR", f"Snapserver error: {e}")
-        print_aplay_devices()
+        log("ERROR", f"snapserver error: {e}")
 
-def start_ledfx_client(host, extra_args):
-    log("INFO", "Starting snapclient + LedFx mode")
-    def terminate(p1, p2):
-        p1.terminate(); p2.terminate()
-        p1.wait(); p2.wait()
-
-    while True:
-        snap_proc = subprocess.Popen(["/usr/bin/snapclient", "-h", host] + extra_args)
-        ledfx_proc = subprocess.Popen(
-            ["/ledfx/venv/bin/ledfx"],
-            cwd="/ledfx",
-            env={**os.environ, "VIRTUAL_ENV": "/ledfx/venv", "PATH": f"/ledfx/venv/bin:{os.environ['PATH']}"}
-        )
-        try:
-            pid, _ = os.wait()
-            if pid in (snap_proc.pid, ledfx_proc.pid):
-                log("WARNING", "Process exited, restarting...")
-                terminate(snap_proc, ledfx_proc)
-        except KeyboardInterrupt:
-            log("INFO", "Interrupted by user")
-            terminate(snap_proc, ledfx_proc)
-            break
-        except Exception as e:
-            log("ERROR", f"Unexpected error: {e}")
-            terminate(snap_proc, ledfx_proc)
-            break
-        sleep(5)
-
-def start_ledfx_only():
-    log("INFO", "Starting LedFx in standalone mode")
-    try:
-        subprocess.run(
-            ["/ledfx/venv/bin/ledfx"],
-            cwd="/ledfx",
-            env={**os.environ, "VIRTUAL_ENV": "/ledfx/venv", "PATH": f"/ledfx/venv/bin:{os.environ['PATH']}"}
-        )
-    except Exception as e:
-        log("ERROR", f"LedFx failed to start: {e}")
-
+# ------------------------ main ------------------------
 def main():
-    role = os.getenv("ROLE", "server").lower()
+    role = os.getenv("ROLE", "server").lower()            # server | client
     host = os.getenv("HOST", "localhost")
-    device_hint = os.getenv("DEVICE_NAME")
-    sound_backend = os.getenv("SOUND_BACKEND", "").lower()
+    client_id = os.getenv("CLIENT_ID")                    # --hostID value
+    device_hint = os.getenv("DEVICE_NAME")                # e.g. "usb dac"
+    loopback = os.getenv("LOOPBACK", "0") == "1"          # set to 1 to use snd-aloop
     loopback_index = int(os.getenv("LOOPBACK_INDEX", "10"))
-    client_id = os.getenv("CLIENT_ID")
-    extra_args_env = os.getenv("EXTRA_ARGS", "")
-    extra_args = extra_args_env.split() if extra_args_env else []
+
+    # ALSA player options (example: buffer_time=100,fragments=4,device=plughw:1,0)
+    player_opts = (os.getenv("PLAYER_OPTIONS") or "").strip()
+    extra_args = (os.getenv("EXTRA_ARGS") or "").split()
 
     print_aplay_devices()
 
-    if sound_backend == "loopback":
-        log("INFO", f"SOUND_BACKEND set to 'loopback', checking device at index {loopback_index}")
-        if not ensure_loopback(loopback_index):
-            log("FATAL", "Loopback backend selected, but loopback device is unavailable. Exiting.")
-            sys.exit(1)
-        extra_args.append(f"--sound=alsa")
-        extra_args.append(f"--soundcard=plughw:{loopback_index},0")
-
-    elif role in ("client", "ledfx_client"):
-        backend = sound_backend if sound_backend in ("alsa", "pulse") else auto_detect_backend()
-        log("INFO", f"Using SOUND_BACKEND: {backend}")
-
-        soundcard = None
-        if not any(arg.startswith("--soundcard") for arg in extra_args):
-            if backend == "alsa" and device_hint:
-                soundcard = resolve_alsa_device(device_hint)
-            elif backend == "pulse":
-                soundcard = "default"
-
-        if not any(arg.startswith("--sound=") for arg in extra_args):
-            extra_args.append(f"--sound={backend}")
-
-        if soundcard and not any(arg.startswith("--soundcard=") for arg in extra_args):
-            extra_args.append(f"--soundcard={soundcard}")
-
-    if not any(arg.startswith("--hostID=") for arg in extra_args):
-        if client_id:
-            extra_args.append(f"--hostID={client_id}")
-            log("INFO", f"Using CLIENT_ID override: {client_id}")
+    # Loopback mode
+    if loopback:
+        if ensure_loopback(loopback_index):
+            if "device=" not in player_opts:
+                player_opts = (player_opts + "," if player_opts else "") + f"device=plughw:{loopback_index},0"
         else:
-            extra_args.append("--hostID=AutoClient")
+            log("FATAL", "LOOPBACK=1 but snd-aloop unavailable")
+            sys.exit(1)
+    else:
+        if device_hint and "device=" not in player_opts:
+            resolved = resolve_alsa_device(device_hint)
+            if resolved:
+                player_opts = (player_opts + "," if player_opts else "") + f"device={resolved}"
 
-    log("INFO", f"Final EXTRA_ARGS: {' '.join(extra_args)}")
+    player_arg = build_player_arg(player_opts)
+
+    if client_id and role == "client":
+        extra_args.append(f"--hostID={client_id}")
+
+    log("INFO", f"ALSA player options: {player_opts}")
+    log("INFO", f"Final args: {' '.join(player_arg + extra_args)}")
 
     if role == "server":
         start_server(extra_args)
     elif role == "client":
-        start_snapclient(host, extra_args)
-    elif role == "ledfx_client":
-        start_ledfx_client(host, extra_args)
-    elif role == "ledfx":
-        start_ledfx_only()
+        start_snapclient(host, player_arg + extra_args)
     else:
-        log("ERROR", f"Invalid ROLE: {role}")
+        log("ERROR", f"Invalid ROLE '{role}'")
         sys.exit(1)
 
 if __name__ == "__main__":

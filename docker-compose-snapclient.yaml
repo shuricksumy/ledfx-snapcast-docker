@@ -18,7 +18,6 @@ services:
       - EXTRA_ARGS=--sampleformat 48000:24:*
     volumes:
       - /dev/snd:/dev/snd
-      - $XDG_RUNTIME_DIR/pulse:/run/user/1000/pulse
     networks:
       - default
       - npm_proxy
