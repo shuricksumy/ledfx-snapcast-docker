@@ -1,4 +1,4 @@
-# --- Stage 1: Build the Python Environment ---
+# --- Stage 1: Builder ---
 FROM debian:trixie-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -11,22 +11,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /ledfx
 RUN python3 -m venv /ledfx/venv
-# Install LedFx inside the virtual environment
 RUN /ledfx/venv/bin/pip install --no-cache-dir --upgrade pip wheel setuptools && \
     /ledfx/venv/bin/pip install --no-cache-dir sounddevice ledfx
 
-# --- Stage 2: Final Image ---
+# --- Stage 2: Final ---
 FROM debian:trixie-slim
 
-# Install system dependencies
-# Note: Using libflac12t64 for Trixie compatibility
+# Updated package names for Trixie Stable
 RUN apt-get update && apt-get install -y --no-install-recommends \
     alsa-utils \
     dbus-daemon \
     avahi-daemon \
     libavahi-client3 \
     libvorbisidec1 \
-    libflac12t64 \
+    libflac8t64 \
     libopus0 \
     libsoxr0 \
     libportaudio2 \
@@ -38,20 +36,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Handle Architecture-specific Snapcast .debs
 ARG TARGETARCH
-# If building manually without buildx, TARGETARCH might be empty. 
-# This line ensures it defaults to amd64 if not specified.
+# If buildx is not used, detect architecture manually
 RUN if [ -z "$TARGETARCH" ]; then TARGETARCH=$(dpkg --print-architecture); fi
 
+# Ensure your .deb files are in the ./pkg folder
 COPY pkg/snapclient_*_${TARGETARCH}_*pipewire.deb /tmp/snapclient.deb
 COPY pkg/snapserver_*_${TARGETARCH}_*pipewire.deb /tmp/snapserver.deb
 
-# Install the .debs and fix any dependency issues automatically
+# Install .debs and fix any dependency gaps automatically
 RUN apt-get update && \
     (apt-get install -y /tmp/snapclient.deb /tmp/snapserver.deb || apt-get install -y -f) && \
     rm /tmp/*.deb && \
     rm -rf /var/lib/apt/lists/*
 
-# IMPORTANT: This matches the "AS builder" name from Stage 1
+# Copy Venv from Builder stage
 COPY --from=builder /ledfx/venv /ledfx/venv
 
 # Setup Environment
