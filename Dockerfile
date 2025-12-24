@@ -1,7 +1,8 @@
 # --- Stage 1: Builder ---
 FROM debian:trixie-slim AS builder
 
-# We need ALL audio development headers for python-rtmidi to compile on Trixie
+# We add 'git' so CMake can fetch dependencies during pip install
+# We add 'libsamplerate0-dev' to help the samplerate package build
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-venv \
@@ -9,24 +10,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-numpy \
     build-essential \
     pkg-config \
+    cmake \
+    git \
     libasound2-dev \
     libjack-dev \
     portaudio19-dev \
     libportaudio2 \
+    libsamplerate0-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /ledfx
 RUN python3 -m venv /ledfx/venv
 
-# Force update of build tools and install LedFx
+# Update core build tools
 RUN /ledfx/venv/bin/pip install --no-cache-dir --upgrade pip wheel setuptools
-# Separating rtmidi can sometimes help debug, but we'll bundle it here
+
+# Install LedFx (this will now be able to compile samplerate using git/cmake)
 RUN /ledfx/venv/bin/pip install --no-cache-dir sounddevice ledfx
 
 # --- Stage 2: Final ---
 FROM debian:trixie-slim
 
-# System dependencies (Using -dev for flac/vorbis to avoid the naming confusion)
+# Final system runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     alsa-utils \
     dbus-daemon \
@@ -43,11 +48,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Handle Architecture
+# Architecture-specific Snapcast installation
 ARG TARGETARCH
 RUN if [ -z "$TARGETARCH" ]; then TARGETARCH=$(dpkg --print-architecture); fi
 
-# Copy and Install Snapcast
 COPY pkg/snapclient_*_${TARGETARCH}_*.deb /tmp/snapclient.deb
 COPY pkg/snapserver_*_${TARGETARCH}_*.deb /tmp/snapserver.deb
 
@@ -56,7 +60,7 @@ RUN apt-get update && \
     rm /tmp/*.deb && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy Venv
+# Copy the successfully built virtualenv
 COPY --from=builder /ledfx/venv /ledfx/venv
 
 ENV PATH="/ledfx/venv/bin:$PATH"
