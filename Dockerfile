@@ -52,8 +52,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ARG TARGETARCH
 RUN if [ -z "$TARGETARCH" ]; then TARGETARCH=$(dpkg --print-architecture); fi
 
-COPY pkg/snapclient_*_${TARGETARCH}_*.deb /tmp/snapclient.deb
-COPY pkg/snapserver_*_${TARGETARCH}_*.deb /tmp/snapserver.deb
+COPY pkg/snapclient_*_${TARGETARCH}_*pipewire.deb /tmp/snapclient.deb
+COPY pkg/snapserver_*_${TARGETARCH}_*pipewire.deb /tmp/snapserver.deb
 
 RUN apt-get update && \
     (apt-get install -y /tmp/snapclient.deb /tmp/snapserver.deb || apt-get install -y -f) && \

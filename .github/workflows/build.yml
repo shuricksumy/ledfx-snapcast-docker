@@ -29,12 +29,13 @@ on:
         required: false
 
 jobs:
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.meta.outputs.version }} # Passes the tag to the scan job
+    permissions: # This section is critical
+      contents: read
+      packages: write 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           submodules: true
