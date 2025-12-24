@@ -1,24 +1,28 @@
 # --- Stage 1: Builder ---
 FROM debian:trixie-slim AS builder
 
+# We need these extra -dev packages so python-rtmidi can compile
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-venv \
     python3-numpy \
     build-essential \
     pkg-config \
+    libasound2-dev \
+    libjack-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /ledfx
 RUN python3 -m venv /ledfx/venv
-RUN /ledfx/venv/bin/pip install --no-cache-dir --upgrade pip wheel setuptools && \
-    /ledfx/venv/bin/pip install --no-cache-dir sounddevice ledfx
+
+# Install build tools first, then LedFx
+RUN /ledfx/venv/bin/pip install --no-cache-dir --upgrade pip wheel setuptools
+RUN /ledfx/venv/bin/pip install --no-cache-dir sounddevice ledfx
 
 # --- Stage 2: Final ---
 FROM debian:trixie-slim
 
-# Use virtual package names (libflac-dev, libvorbis-dev) 
-# instead of specific versioned ones (libflac12t64, etc.)
+# Install system dependencies using generic names to avoid version mismatches
 RUN apt-get update && apt-get install -y --no-install-recommends \
     alsa-utils \
     dbus-daemon \
@@ -39,19 +43,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ARG TARGETARCH
 RUN if [ -z "$TARGETARCH" ]; then TARGETARCH=$(dpkg --print-architecture); fi
 
-# Copy and Install Snapcast
+# Copy and Install Snapcast from your local pkg folder
 COPY pkg/snapclient_*_${TARGETARCH}_*pipewire.deb /tmp/snapclient.deb
 COPY pkg/snapserver_*_${TARGETARCH}_*pipewire.deb /tmp/snapserver.deb
 
-# We use 'apt-get install -y /tmp/...' because it handles dependencies 
-# better than 'dpkg -i'. If it fails, the '-f' flag fixes it using the 
-# libraries we installed above.
 RUN apt-get update && \
-    apt-get install -y /tmp/snapclient.deb /tmp/snapserver.deb || apt-get install -y -f && \
+    (apt-get install -y /tmp/snapclient.deb /tmp/snapserver.deb || apt-get install -y -f) && \
     rm /tmp/*.deb && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy Venv from Builder
+# Copy the working virtualenv from builder
 COPY --from=builder /ledfx/venv /ledfx/venv
 
 ENV PATH="/ledfx/venv/bin:$PATH"
