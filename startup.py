@@ -3,145 +3,69 @@ import os
 import sys
 import subprocess
 from pathlib import Path
+from datetime import datetime
 from time import sleep
 
-# ------------------------ logging ------------------------
 def log(level, msg):
-    from datetime import datetime
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [{level}]  ➡️  {msg}", flush=True)
 
-# ------------------------ ALSA helpers ------------------------
-def print_aplay_devices():
-    log("INFO", "🔊 ALSA devices (aplay -L):")
-    try:
-        out = subprocess.run(["aplay", "-L"], capture_output=True, text=True, check=True).stdout
-        print(out)
-    except Exception as e:
-        log("ERROR", f"aplay -L failed: {e}")
+def setup_system_services():
+    """Start DBus and Avahi (required for discovery and some audio backends)."""
+    log("INFO", "🔧 Initializing System Services (DBus/Avahi)")
+    
+    # Setup DBus
+    Path("/run/dbus").mkdir(parents=True, exist_ok=True)
+    if Path("/run/dbus/pid").exists(): Path("/run/dbus/pid").unlink()
+    subprocess.run(["dbus-daemon", "--system", "--fork"], check=False)
+    
+    # Setup Avahi (Needs its own run directory)
+    Path("/run/avahi-daemon").mkdir(parents=True, exist_ok=True)
+    # Ensure permissions (avahi user is usually 105 or 106, but 'avahi' name is safer)
+    subprocess.run(["chown", "avahi:avahi", "/run/avahi-daemon"], check=False)
+    
+    subprocess.run(["avahi-daemon", "--daemonize"], check=False)
+    sleep(0.5) # Short wait to let discovery settle
 
-def resolve_alsa_device(device_name_hint: str | None) -> str | None:
-    """Find an ALSA hw/plughw device matching the given name hint."""
-    if not device_name_hint:
-        return None
-    try:
-        out = subprocess.run(["aplay", "-L"], capture_output=True, text=True, check=True).stdout
-        lines = out.splitlines()
-        for i in range(len(lines) - 1):
-            if lines[i].startswith(("plughw:", "hw:")):
-                desc = lines[i + 1].lower()
-                if device_name_hint.lower() in desc:
-                    cand = lines[i].strip()
-                    log("INFO", f"Resolved '{device_name_hint}' -> {cand}")
-                    return cand
-    except Exception as e:
-        log("ERROR", f"Device resolve failed: {e}")
-    return None
-
-def ensure_loopback(index=10) -> bool:
-    """Load snd-aloop for loopback playback/monitoring."""
-    try:
-        out = subprocess.check_output(["aplay", "-l"], text=True)
-        if "Loopback" in out:
-            log("INFO", "Loopback already present")
-            return True
-        log("INFO", f"Loading snd-aloop index={index}")
-        subprocess.run(["modprobe", "snd-aloop", f"index={index}"], check=True)
-        sleep(1.5)
-        out = subprocess.check_output(["aplay", "-l"], text=True)
-        ok = "Loopback" in out
-        log("INFO" if ok else "ERROR", "Loopback ready" if ok else "Loopback missing")
-        return ok
-    except Exception as e:
-        log("ERROR", f"Loopback setup failed: {e}")
-        return False
-
-# ------------------------ runner helpers ------------------------
-def build_player_arg(opts: str | None) -> list[str]:
-    arg = "alsa" if not opts else f"alsa:{opts}"
-    return ["--player", arg]
-
-def start_snapclient(host: str, args: list[str]):
-    log("INFO", f"Starting snapclient for {host} with args: {' '.join(args)}")
-    try:
-        subprocess.run(["/usr/bin/snapclient", "-h", host] + args, check=True)
-    except subprocess.CalledProcessError as e:
-        log("ERROR", f"snapclient exited with code {e.returncode}")
-        print_aplay_devices()
-
-def start_server(args: list[str]):
-    log("INFO", "Starting snapserver (server mode)")
-    cfg = Path("/config/snapserver.conf")
-    if not cfg.exists():
-        default = Path("/etc/snapserver.conf")
-        cfg.write_text(default.read_text())
-        log("INFO", "Copied default snapserver.conf to /config")
-
-    try:
-        Path("/run/dbus").mkdir(parents=True, exist_ok=True)
-        if subprocess.run(["pgrep", "dbus-daemon"], capture_output=True).returncode != 0:
-            pid_path = Path("/run/dbus/pid")
-            if pid_path.exists():
-                pid_path.unlink(missing_ok=True)
-            subprocess.run(["dbus-daemon", "--system"], check=True)
-            log("INFO", "dbus-daemon started")
-    except Exception as e:
-        log("WARNING", f"dbus setup issue: {e}")
-
-    try:
-        subprocess.Popen(["avahi-daemon", "--no-chroot"])
-        log("INFO", "avahi-daemon started")
-    except Exception as e:
-        log("WARNING", f"avahi start issue: {e}")
-
-    try:
-        subprocess.run(["/usr/bin/snapserver", "-c", str(cfg)] + args, check=True)
-    except Exception as e:
-        log("ERROR", f"snapserver error: {e}")
-
-# ------------------------ main ------------------------
 def main():
-    role = os.getenv("ROLE", "server").lower()            # server | client
+    role = os.getenv("ROLE", "server").lower()
     host = os.getenv("HOST", "localhost")
-    client_id = os.getenv("CLIENT_ID")                    # --hostID value
-    device_hint = os.getenv("DEVICE_NAME")                # e.g. "usb dac"
-    loopback = os.getenv("LOOPBACK", "0") == "1"          # set to 1 to use snd-aloop
-    loopback_index = int(os.getenv("LOOPBACK_INDEX", "10"))
-
-    # ALSA player options (example: buffer_time=100,fragments=4,device=plughw:1,0)
-    player_opts = (os.getenv("PLAYER_OPTIONS") or "").strip()
+    backend = os.getenv("SOUND_BACKEND", "alsa").lower() 
+    player_opts = os.getenv("PLAYER_OPTIONS", "")
     extra_args = (os.getenv("EXTRA_ARGS") or "").split()
 
-    print_aplay_devices()
-
-    # Loopback mode
-    if loopback:
-        if ensure_loopback(loopback_index):
-            if "device=" not in player_opts:
-                player_opts = (player_opts + "," if player_opts else "") + f"device=plughw:{loopback_index},0"
-        else:
-            log("FATAL", "LOOPBACK=1 but snd-aloop unavailable")
-            sys.exit(1)
-    else:
-        if device_hint and "device=" not in player_opts:
-            resolved = resolve_alsa_device(device_hint)
-            if resolved:
-                player_opts = (player_opts + "," if player_opts else "") + f"device={resolved}"
-
-    player_arg = build_player_arg(player_opts)
-
-    if client_id and role == "client":
-        extra_args.append(f"--hostID={client_id}")
-
-    log("INFO", f"ALSA player options: {player_opts}")
-    log("INFO", f"Final args: {' '.join(player_arg + extra_args)}")
+    # Filter legacy Snapcast args to prevent crashes
+    extra_args = [a for a in extra_args if not a.startswith(("--sound", "-s"))]
 
     if role == "server":
-        start_server(extra_args)
-    elif role == "client":
-        start_snapclient(host, player_arg + extra_args)
+        setup_system_services()
+        # Prioritize /config/snapserver.conf if volume-mounted
+        cfg = Path("/config/snapserver.conf")
+        if not cfg.exists():
+            cfg = Path("/etc/snapserver.conf")
+            
+        log("INFO", f"🚀 ROLE: SERVER - Using config: {cfg}")
+        os.execv("/usr/bin/snapserver", ["snapserver", "-c", str(cfg)] + extra_args)
+
+    elif "ledfx" in role:
+        setup_system_services()
+        log("INFO", "💡 ROLE: LEDFX - Launching Visualizer and Client")
+        
+        # Start LedFx in background
+        ledfx_bin = "/ledfx/venv/bin/ledfx" if Path("/ledfx/venv/bin/ledfx").exists() else "ledfx"
+        subprocess.Popen([ledfx_bin, "--host", "0.0.0.0", "--port", "8888"])
+        
+        # LedFx Logic: ALSA needs Loopback
+        if backend == "alsa" and "device=" not in player_opts:
+            player_opts = "device=hw:Loopback,0,0"
+        
+        p_arg = ["-p", f"{backend}:{player_opts}"] if player_opts else ["-p", backend]
+        log("INFO", f"🔈 Starting client with backend: {backend}")
+        os.execv("/usr/bin/snapclient", ["snapclient", "-h", host] + p_arg + extra_args)
+
     else:
-        log("ERROR", f"Invalid ROLE '{role}'")
-        sys.exit(1)
+        log("INFO", f"🔈 ROLE: CLIENT - Backend: {backend}")
+        p_arg = ["-p", f"{backend}:{player_opts}"] if player_opts else ["-p", backend]
+        os.execv("/usr/bin/snapclient", ["snapclient", "-h", host] + p_arg + extra_args)
 
 if __name__ == "__main__":
     main()
