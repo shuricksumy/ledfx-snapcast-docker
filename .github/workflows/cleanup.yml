@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       IMAGE_NAME: shuricksumy/ledfx-snapcast-docker
-      IMAGE_PATTERN: "snapcast*"  # Pattern for image names with a wildcard
+      IMAGE_PATTERN: "ledfx-snapcast-docker*"  # Pattern for image names with a wildcard
 
     steps:
       - name: Login to GitHub Container Registry
