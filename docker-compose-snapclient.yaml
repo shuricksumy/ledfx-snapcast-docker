@@ -2,22 +2,18 @@ version: '3.9'
 
 services:
   snapclient:
-    image: ghcr.io/shuricksumy/snapcast:latest
-    container_name: snapclient
+    image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
+    container_name: snapclient_dx5
     restart: unless-stopped
     devices:
-      - "/dev/snd:/dev/snd"
+      - "/dev/snd:/dev/snd" # Access hardware cards
     environment:
-      - UID=1000
-      - GID=1000
       - ROLE=client
-      - HOST=192.168.88.111
+      - HOST=192.168.111.111
       - SOUND_BACKEND=alsa
-      - DEVICE_NAME=DX3 Pro
-      - CLIENT_ID=DX3 Pro
-      - EXTRA_ARGS=--sampleformat 48000:24:*
-    volumes:
-      - /dev/snd:/dev/snd
+      - DEVICE_NAME=DX5      # Matches your startup.py logic to find the card
+      - CLIENT_ID=DX5-SNAP
+      # - EXTRA_ARGS=--sampleformat 48000:24:*
     networks:
       - default
       - npm_proxy

@@ -20,7 +20,7 @@ def setup_system_services():
     
     # Setup Avahi (Needs its own run directory)
     Path("/run/avahi-daemon").mkdir(parents=True, exist_ok=True)
-    # Ensure permissions (avahi user is usually 105 or 106, but 'avahi' name is safer)
+    # Ensure permissions for the avahi user
     subprocess.run(["chown", "avahi:avahi", "/run/avahi-daemon"], check=False)
     
     subprocess.run(["avahi-daemon", "--daemonize"], check=False)
@@ -33,7 +33,7 @@ def main():
     player_opts = os.getenv("PLAYER_OPTIONS", "")
     extra_args = (os.getenv("EXTRA_ARGS") or "").split()
 
-    # Filter legacy Snapcast args to prevent crashes
+    # Filter legacy Snapcast args to prevent crashes in v0.27+
     extra_args = [a for a in extra_args if not a.startswith(("--sound", "-s"))]
 
     if role == "server":

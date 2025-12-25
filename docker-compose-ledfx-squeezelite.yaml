@@ -1,36 +1,45 @@
-version: '3.9'
+version: '3.8'
+
+networks:
+  default:
+    driver: bridge
+  npm_proxy:
+    name: npm_proxy
+    external: true  # Assuming this network already exists for your proxy
 
 services:
-  ledfx:
-    image: ghcr.io/shuricksumy/snapcast:latest
-    container_name: ledfx
+  snapclient:
+    image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
+    container_name: snapclient
     restart: unless-stopped
-    ports:
-      - "8888:8888"
+    # Use privileged if your startup.py needs to start D-Bus/Avahi
+    privileged: true 
     devices:
       - "/dev/snd:/dev/snd"
     environment:
-      - ROLE=ledfx
-      - SOUND_BACKEND=loopback
-      - LOOPBACK_INDEX=10
-    volumes:
-      - $DATA_DIR/ledfx:/root/.ledfx
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-    depends_on:
-      - squeezelite-ledfx
+      - ROLE=client
+      - HOST=192.168.111.111
+      - SOUND_BACKEND=alsa
+      - DEVICE_NAME=DX5
+      - CLIENT_ID=DX5-SNAP
+      # Removed UID/GID as they can interfere with ALSA access in some setups
+    networks:
+      - default
+      - npm_proxy
 
-  squeezelite-ledfx:
-    image: giof71/squeezelite
-    container_name: squeezelite-ledfx
+  squeezelite:
+    image: giof71/squeezelite:stable
+    container_name: squeezelite-mainplayer
+    network_mode: host
+    privileged: true 
     devices:
       - /dev/snd:/dev/snd
-    network_mode: host
     environment:
-      - SQUEEZELITE_NAME=LedFx
-      - SQUEEZELITE_AUDIO_DEVICE=hw:CARD=Loopback,DEV=0
-      - SQUEEZELITE_SERVER_PORT=192.168.88.111:3483
-      - STARTUP_DELAY_SEC=0
+      - SQUEEZELITE_MODE=ALSA
+      - SQUEEZELITE_AUDIO_DEVICE=hw:CARD=DX5,DEV=0 
+      - SQUEEZELITE_NAME=DX5-Direct
+      - SQUEEZELITE_SERVER_PORT=192.168.111.111:3483
+      # Combined arguments properly
+      - SQUEEZELITE_EXTRA_ARGS=-u V -X -C 5
+      - SQUEEZELITE_MAC_ADDRESS=72:23:90:63:08:86
     restart: unless-stopped
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"

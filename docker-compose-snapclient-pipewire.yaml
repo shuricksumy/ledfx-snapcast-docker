@@ -1,0 +1,19 @@
+version: '3.9'
+
+services:
+  snapclient-pw:
+    image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
+    container_name: snapclient_pipewire
+    restart: unless-stopped
+    # PipeWire usually runs under your local user (ID 1000)
+    user: "1000:1000" 
+    environment:
+      - ROLE=client
+      - HOST=192.168.111.111
+      - SOUND_BACKEND=pipewire
+      - XDG_RUNTIME_DIR=/run/user/1000
+    volumes:
+      # Map the PipeWire socket from the host
+      - /run/user/1000/pipewire-0:/run/user/1000/pipewire-0
+    networks:
+      - default

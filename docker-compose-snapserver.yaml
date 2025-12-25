@@ -2,14 +2,23 @@ version: '3.9'
 
 services:
   snapserver:
-    image: ghcr.io/shuricksumy/snapcast:latest
-    container_name: snapserver
-    restart: unless-stopped
-    environment:
-      - ROLE=server
-    volumes:
-      - ${DATA_DIR}/snapcast:/tmp/snapcast
-      - ${DATA_DIR}/snapserver/config:/config
-    network_mode: host
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
+      container_name: snapserver
+      restart: always
+      privileged: true # Required for the startup script to start D-Bus and Avahi
+      network_mode: host
+      labels:
+        - "wud.watch=true"
+        - "wud.tag.include=^latest$"
+        - "wud.watch.digest=true"
+      volumes:
+        # Persistent config and streams
+        - ${DATA_DIR}/snapserver/config:/config
+        # Named pipes for audio input (MPD, Mopidy, etc.)
+        - /tmp/snapfifo:/tmp/snapfifo
+        # Optional: share the snapcast internal state/db
+        - ${DATA_DIR}/snapcast:/var/lib/snapcast 
+      environment:
+        - ROLE=server
+        # You can pass extra streams here instead of editing the .conf file
+        - EXTRA_ARGS=--stream.stream="pipe:///tmp/snapfifo?name=Default&sampleformat=48000:16:2"
