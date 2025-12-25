@@ -105,8 +105,17 @@ sudo apt update
 # compatibility layers for ALSA and PulseAudio applications.
 sudo apt install pipewire-audio wireplumber
 
+sudo apt update
+sudo apt install dbus-user-session
+
 # Enable the services for your user (do NOT use sudo for these)
+systemctl start user@1000
+sudo -u dietpi XDG_RUNTIME_DIR=/run/user/1000 systemctl --user status pipewire
+or
 systemctl --user --now enable pipewire pipewire-pulse wireplumber
+
+#check
+ls -lah /run/user/1000/
 ```
 
 2. Prerequisites (Host Machine):
