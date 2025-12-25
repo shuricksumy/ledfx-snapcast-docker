@@ -17,7 +17,7 @@ jobs:
     name: Delete Untagged Package Versions
     runs-on: ubuntu-latest
     env:
-      IMAGE_NAME: shuricksumy/snapcast
+      IMAGE_NAME: shuricksumy/ledfx-snapcast-docker
       IMAGE_PATTERN: "snapcast*"  # Pattern for image names with a wildcard
 
     steps:
