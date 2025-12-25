@@ -58,13 +58,15 @@ def main():
         if backend == "alsa" and "device=" not in player_opts:
             player_opts = "device=hw:Loopback,0,0"
         
-        p_arg = ["-p", f"{backend}:{player_opts}"] if player_opts else ["-p", backend]
+        # --- FIX: Changed -p to --player ---
+        p_arg = ["--player", f"{backend}:{player_opts}"] if player_opts else ["--player", backend]
         log("INFO", f"🔈 Starting client with backend: {backend}")
         os.execv("/usr/bin/snapclient", ["snapclient", "-h", host] + p_arg + extra_args)
 
     else:
         log("INFO", f"🔈 ROLE: CLIENT - Backend: {backend}")
-        p_arg = ["-p", f"{backend}:{player_opts}"] if player_opts else ["-p", backend]
+        # --- FIX: Changed -p to --player ---
+        p_arg = ["--player", f"{backend}:{player_opts}"] if player_opts else ["--player", backend]
         os.execv("/usr/bin/snapclient", ["snapclient", "-h", host] + p_arg + extra_args)
 
 if __name__ == "__main__":
