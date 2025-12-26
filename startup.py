@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-import os
-import sys
-import subprocess
-import shutil
+import os, sys, subprocess, shutil
 from pathlib import Path
 from datetime import datetime
 from time import sleep
@@ -11,58 +8,54 @@ def log(level, msg):
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [{level}]  ➡️  {msg}", flush=True)
 
 def setup_system_services():
-    """Start DBus and Avahi (required for discovery and PipeWire)."""
-    log("INFO", "🔧 Initializing System Services (DBus/Avahi)")
+    log("INFO", "🔧 Initializing DBus & Avahi")
     Path("/run/dbus").mkdir(parents=True, exist_ok=True)
-    if Path("/run/dbus/pid").exists():
-        Path("/run/dbus/pid").unlink()
+    for p in ["/run/dbus/pid", "/run/dbus/system_bus_socket"]:
+        if Path(p).exists(): Path(p).unlink()
     subprocess.run(["dbus-daemon", "--system", "--fork"], check=False)
+    
     Path("/run/avahi-daemon").mkdir(parents=True, exist_ok=True)
+    if Path("/run/avahi-daemon/pid").exists(): Path("/run/avahi-daemon/pid").unlink()
     subprocess.run(["chown", "avahi:avahi", "/run/avahi-daemon"], check=False)
     subprocess.run(["avahi-daemon", "--daemonize"], check=False)
-    sleep(0.3)
+    sleep(0.5)
+
+def setup_pipewire():
+    log("INFO", "🎸 Configuring PipeWire Context")
+    Path("/etc/pipewire").mkdir(parents=True, exist_ok=True)
+    Path("/run/user/1000").mkdir(parents=True, exist_ok=True)
+    conf = Path("/etc/pipewire/client.conf")
+    conf.write_text("context.modules = [ { name = libpipewire-module-protocol-native } { name = libpipewire-module-client-node } { name = libpipewire-module-adapter } ]\n")
+    os.environ.update({
+        "PIPEWIRE_RUNTIME_DIR": "/run/user/1000",
+        "PIPEWIRE_REMOTE": "pipewire-0",
+        "XDG_CONFIG_HOME": "/etc"
+    })
 
 def main():
     role = os.getenv("ROLE", "server").lower()
     host_raw = os.getenv("HOST", "localhost").strip()
     backend = os.getenv("SOUND_BACKEND", "alsa").lower() 
     player_opts = os.getenv("PLAYER_OPTIONS", "")
-    extra_args = (os.getenv("EXTRA_ARGS") or "").split()
+    
+    setup_system_services()
+    if backend == "pipewire": setup_pipewire()
 
-    # Fix for Snapcast 0.27+ URI requirement
-    if "://" not in host_raw:
-        host_uri = f"tcp://{host_raw}"
-    else:
-        host_uri = host_raw
-
-    # Filter out deprecated/fatal arguments
-    extra_args = [a for a in extra_args if not a.startswith(("--sound", "-s", "-h", "--host", "--port"))]
+    # --- URI AUTO-FIX ---
+    host_uri = host_raw if "://" in host_raw else f"tcp://{host_raw}"
 
     if role == "server":
-        setup_system_services()
         cfg = Path("/config/snapserver.conf") if Path("/config/snapserver.conf").exists() else Path("/etc/snapserver.conf")
-        log("INFO", f"🚀 ROLE: SERVER - Using config: {cfg}")
-        os.execv("/usr/bin/snapserver", ["snapserver", "-c", str(cfg)] + extra_args)
-
+        log("INFO", f"🚀 SERVER STARTING: {cfg}")
+        os.execv("/usr/bin/snapserver", ["snapserver", "-c", str(cfg)])
     else:
         if "ledfx" in role:
-            setup_system_services()
-            log("INFO", "💡 ROLE: LEDFX - Launching Visualizer and Client")
-            ledfx_bin = "/ledfx/venv/bin/ledfx" if Path("/ledfx/venv/bin/ledfx").exists() else shutil.which("ledfx")
-            if ledfx_bin:
-                subprocess.Popen([ledfx_bin, "--host", "0.0.0.0", "--port", "8888"])
-            else:
-                log("ERROR", "LedFx binary not found!")
-            
-            if backend == "alsa" and "device=" not in player_opts:
-                player_opts = "device=hw:Loopback,0,0"
-
-        log("INFO", f"🔈 ROLE: {role.upper()} - Backend: {backend} | URI: {host_uri}")
-        p_arg = ["--player", f"{backend}:{player_opts}"] if player_opts else ["--player", backend]
+            log("INFO", "💡 LEDFX STARTING")
+            subprocess.Popen(["ledfx", "--host", "0.0.0.0", "--port", "8888"])
         
-        # Build final command with URI as last positional argument
-        client_cmd = ["snapclient"] + p_arg + extra_args + [host_uri]
-        os.execv("/usr/bin/snapclient", client_cmd)
+        log("INFO", f"🔈 CLIENT STARTING: {backend} ➡️ {host_uri}")
+        p_arg = ["--player", f"{backend}:{player_opts}"] if player_opts else ["--player", backend]
+        os.execv("/usr/bin/snapclient", ["snapclient"] + p_arg + [host_uri])
 
 if __name__ == "__main__":
     main()
