@@ -1,6 +1,6 @@
 # Docker Builder for Snapcast and LedFX
 
-A high-performance, multi-arch (AMD64/ARM64) Docker image based on Debian 13 (Trixie). Optimized for low-latency audio, discovery via Avahi/mDNS, and flexible audio backends (ALSA/PipeWire).
+A high-performance, multi-arch (AMD64/ARM64) Docker image based on Debian 13 (Trixie). Optimized for low-latency audio, discovery via Avahi/mDNS, and flexible audio backends (ALSA).
 
 ---
 
@@ -58,7 +58,7 @@ services:
       - "/dev/snd:/dev/snd"
     environment:
       - ROLE=client
-      - HOST=192.168.111.111
+      - HOST=192.168.111.111:1704
       - SOUND_BACKEND=alsa
       - DEVICE_NAME=DX5
       - CLIENT_ID=LivingRoom-DX5
@@ -85,62 +85,9 @@ services:
       - ROLE=ledfx
       - HOST=192.168.111.111
       - SOUND_BACKEND=alsa
-      - PLAYER_OPTIONS=device=hw:Loopback,0,0
-```
----
-
-## 🎷 Case 4: PipeWire Integration (Client Mode)
-
-For hosts running PipeWire natively (Ubuntu 22.04+, Fedora, etc.). This maps the host's audio socket directly into the container.
-
-Using PipeWire with this Docker container allows the audio stream to appear as a native application on your host system.
-
-1. Install
-```
-# Update your package list
-sudo apt update
-
-# Install the recommended PipeWire metapackage for audio
-# This automatically includes wireplumber (session manager) and 
-# compatibility layers for ALSA and PulseAudio applications.
-sudo apt install pipewire-audio wireplumber
-
-sudo apt update
-sudo apt install dbus-user-session
-
-# Enable the services for your user (do NOT use sudo for these)
-systemctl start user@1000
-sudo -u dietpi XDG_RUNTIME_DIR=/run/user/1000 systemctl --user status pipewire
-or
-systemctl --user --now enable pipewire pipewire-pulse wireplumber
-
-#check
-ls -lah /run/user/1000/
+      - PLAYER_OPTIONS=device=hw:Loopback,10,0
 ```
 
-2. Prerequisites (Host Machine):
-   - Verify PipeWire is running: ``` systemctl --user status pipewire.service ```
-   - Identify your User ID: id -u (usually 1000)
-   - Run ```pactl info | grep "Server Name"```
-
-3. Docker Compose Configuration:
-   To link the container, mount the socket and set the environment.
-
-```
-services:
-  snapclient-pw:
-    image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
-    container_name: snapclient_pipewire
-    user: "1000:1000" 
-    environment:
-      - ROLE=client
-      - HOST=192.168.111.111
-      - SOUND_BACKEND=pipewire
-      - XDG_RUNTIME_DIR=/run/user/1000
-    volumes:
-      - /run/user/1000/pipewire-0:/run/user/1000/pipewire-0
-    network_mode: host
-```
 ---
 
 ## 🧠 Setup: ALSA Loopback (Required for LedFx)
