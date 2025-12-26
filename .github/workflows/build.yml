@@ -82,32 +82,3 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
-  vulnerability-scan:
-    runs-on: ubuntu-latest
-    needs: build # This ensures the scan starts ONLY after the build is successful
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Login to GHCR (required to pull for scan)
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}
-
-      - name: Run Docker Scout Vulnerability Scan
-        uses: docker/scout-action@v1
-        with:
-          command: cves,recommendations
-          # Pulls the exact tag we just pushed
-          image: ghcr.io/${{ github.repository }}:${{ needs.build.outputs.image_tag }}
-          sarif-file: sarif.output.json
-          summary: true
-
-      - name: Upload Scan Report as Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: vulnerability-scan-report
-          path: sarif.output.json

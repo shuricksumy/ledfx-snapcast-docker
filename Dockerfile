@@ -13,6 +13,7 @@ FROM debian:trixie-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     alsa-utils dbus-daemon avahi-daemon \
     libvorbis-dev libflac-dev libopus0 libsoxr0 \
+    libasound2-dev libjack-dev portaudio19-dev libportaudio2 libsamplerate0-dev \
     python3 && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ARG TARGETARCH

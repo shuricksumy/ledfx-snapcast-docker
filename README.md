@@ -57,9 +57,9 @@ services:
       - "/dev/snd:/dev/snd"
     environment:
       - ROLE=client
-      - HOST=192.168.111.111:1704
+      - HOST=192.168.111.111
       - SOUND_BACKEND=alsa
-      - ALSA_DEVICE=hw:DX5
+      - ALSA_DEVICE=plughw:DX5
       - CLIENT_ID=LivingRoom-DX5
     networks:
       - default
