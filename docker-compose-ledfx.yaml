@@ -13,7 +13,8 @@ services:
       - ROLE=ledfx
       - HOST=192.168.111.111
       - SOUND_BACKEND=alsa
-      - PLAYER_OPTIONS=device=hw:Loopback,0,0
+      - ALSA_DEVICE=hw:Loopback,10,0
+     #- EXTRA_ARGS=--some-arg value
     networks:
       - default
       - npm_proxy

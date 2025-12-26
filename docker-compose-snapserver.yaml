@@ -9,7 +9,6 @@ services:
     environment:
       - ROLE=server 
     volumes:
-      - /dev/shm:/dev/shm           # Crucial for PipeWire data exchange
-      - ./snapserver.conf:/etc/snapserver.conf:ro
-      - ./data:/config
+      - ${DATA_DIR}/snapserver/config:/config
       - /etc/localtime:/etc/localtime:ro
+      - /tmp/snapfifo:/tmp

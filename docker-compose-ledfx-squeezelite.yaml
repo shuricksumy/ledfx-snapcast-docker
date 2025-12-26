@@ -12,16 +12,15 @@ services:
     image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
     container_name: snapclient
     restart: unless-stopped
-    # Use privileged if your startup.py needs to start D-Bus/Avahi
-    privileged: true 
     devices:
       - "/dev/snd:/dev/snd"
     environment:
       - ROLE=client
       - HOST=192.168.111.111
       - SOUND_BACKEND=alsa
-      - DEVICE_NAME=DX5
+      - ALSA_DEVICE=DX5
       - CLIENT_ID=DX5-SNAP
+      #- EXTRA_ARGS=--sampleformat 48000:24:*
       # Removed UID/GID as they can interfere with ALSA access in some setups
     networks:
       - default

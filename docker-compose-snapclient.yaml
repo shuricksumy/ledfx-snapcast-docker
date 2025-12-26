@@ -11,7 +11,7 @@ services:
       - ROLE=client
       - HOST=192.168.111.111
       - SOUND_BACKEND=alsa
-      - DEVICE_NAME=DX5      # Matches your startup.py logic to find the card
+      - ALSA_DEVICE=hw:DX5
       - CLIENT_ID=DX5-SNAP
       # - EXTRA_ARGS=--sampleformat 48000:24:*
     networks:

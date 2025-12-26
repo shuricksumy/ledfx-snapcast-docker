@@ -19,8 +19,7 @@ A high-performance, multi-arch (AMD64/ARM64) Docker image based on Debian 13 (Tr
 | ROLE            | server, client, or ledfx                              | server    |
 | HOST            | IP or Hostname of the Snapserver                            | localhost |
 | SOUND_BACKEND   | alsa or pipewire                                        | alsa      |
-| DEVICE_NAME     | ALSA device name hint (matched via aplay -L)              | -           |
-| PLAYER_OPTIONS  | Specific Snapclient backend options (e.g., device=hw:1,0) | -           |
+| ALSA_DEVICE     | ALSA device name hint (matched via aplay -L) Ex.hw:Pro, hw:0:0             | -           |
 | CLIENT_ID       | Optional unique name for the Snapclient instance            | -           |
 | EXTRA_ARGS      | Raw flags passed to the binary (filtered for modern syntax) | -           |
 
@@ -35,11 +34,11 @@ services:
     image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
     container_name: snapserver
     restart: always
-    privileged: true 
     network_mode: host
     volumes:
       - ${DATA_DIR}/snapserver/config:/config
-      - /tmp/snapfifo:/tmp/snapfifo
+      - /tmp/snapfifo:/tmp
+      - /etc/localtime:/etc/localtime:ro
     environment:
       - ROLE=server
 ```
@@ -60,7 +59,7 @@ services:
       - ROLE=client
       - HOST=192.168.111.111:1704
       - SOUND_BACKEND=alsa
-      - DEVICE_NAME=DX5
+      - ALSA_DEVICE=hw:DX5
       - CLIENT_ID=LivingRoom-DX5
     networks:
       - default
@@ -84,8 +83,7 @@ services:
     environment:
       - ROLE=ledfx
       - HOST=192.168.111.111
-      - SOUND_BACKEND=alsa
-      - PLAYER_OPTIONS=device=hw:Loopback,10,0
+      - SOUND_BACKEND=hw:Loopback,10,0
 ```
 
 ---
