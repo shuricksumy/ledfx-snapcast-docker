@@ -1,6 +1,8 @@
 FROM debian:trixie-slim AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-pip python3-venv python3-dev build-essential libasound2-dev \
+    python3-pip python3-venv python3-dev python3-numpy \
+    build-essential pkg-config cmake git \
+    libasound2-dev libjack-dev portaudio19-dev libportaudio2 libsamplerate0-dev \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /ledfx
 RUN python3 -m venv /ledfx/venv
