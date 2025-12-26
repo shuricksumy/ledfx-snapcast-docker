@@ -83,7 +83,7 @@ services:
     environment:
       - ROLE=ledfx
       - HOST=192.168.111.111
-      - SOUND_BACKEND=hw:Loopback,10,0
+      - LOOPBACK_NUMBER=10
 ```
 
 ---
