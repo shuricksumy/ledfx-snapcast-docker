@@ -1,4 +1,4 @@
-# Docker Builder for Snapcast and LedFX
+# Docker Builder for [Snapcast](https://github.com/snapcast/snapcast) and [LedFX](https://github.com/LedFx/LedFx)
 
 A high-performance, multi-arch (AMD64/ARM64) Docker image based on Debian 13 (Trixie). Optimized for low-latency audio, discovery via Avahi/mDNS, and flexible audio backends (ALSA).
 
