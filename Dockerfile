@@ -14,8 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ARG TARGETARCH
-COPY pkg/snapclient_*_${TARGETARCH}.deb /tmp/snapclient.deb
-COPY pkg/snapserver_*_${TARGETARCH}.deb /tmp/snapserver.deb
+COPY pkg/snapclient_*_${TARGETARCH}_*.deb /tmp/snapclient.deb
+COPY pkg/snapserver_*_${TARGETARCH}_*.deb /tmp/snapserver.deb
 RUN apt-get update && apt-get install -y /tmp/snapclient.deb /tmp/snapserver.deb || apt-get install -y -f \
     && rm /tmp/*.deb && rm -rf /var/lib/apt/lists/*
 
