@@ -8,31 +8,36 @@ def log(level, msg):
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [{level}]  ➡️  {msg}", flush=True)
 
 def setup_internal_audio():
-    log("INFO", "🔊 Starting Standalone PipeWire Audio Stack")
-    # Setup runtime env for root
-    os.makedirs("/run/user/0", exist_ok=True)
-    os.environ["XDG_RUNTIME_DIR"] = "/run/user/0"
+    log("INFO", "🔊 Initializing Standalone Audio Stack (Root Mode)")
     
-    # 1. Start DBus (Mandatory for PipeWire/WirePlumber)
-    Path("/run/dbus").mkdir(parents=True, exist_ok=True)
-    if Path("/run/dbus/pid").exists(): Path("/run/dbus/pid").unlink()
+    # 1. Force the Runtime Directory
+    runtime_dir = "/run/user/0"
+    os.makedirs(runtime_dir, exist_ok=True)
+    os.chmod(runtime_dir, 0o700)
+    os.environ["XDG_RUNTIME_DIR"] = runtime_dir
+    
+    # 2. Start System DBus
+    log("INFO", "🚌 Starting System DBus")
+    os.makedirs("/run/dbus", exist_ok=True)
+    if os.path.exists("/run/dbus/pid"): os.remove("/run/dbus/pid")
     subprocess.run(["dbus-daemon", "--system", "--fork"], check=False)
-
-    # 2. Start PipeWire Daemons
-    subprocess.Popen(["pipewire"], stdout=subprocess.DEVNULL)
     sleep(1)
-    subprocess.Popen(["wireplumber"], stdout=subprocess.DEVNULL)
-    sleep(2) # Wait for USB scan
 
-    # 3. Configure ALSA Bridge
-    alsa_conf = Path("/etc/alsa/conf.d/99-pipewire-default.conf")
-    alsa_conf.write_text('pcm.!default { type pipewire }\nctl.!default { type pipewire }\n')
+    # 3. Launch PipeWire & WirePlumber inside a DBus Session
+    # This prevents the "$DISPLAY" and "Session Bus" errors
+    log("INFO", "🎸 Launching PipeWire + WirePlumber")
     
-    # 4. Set Environment for Snapclient
-    os.environ.update({
-        "PIPEWIRE_RUNTIME_DIR": "/run/user/0",
-        "PIPEWIRE_REMOTE": "pipewire-0",
-    })
+    # Use 'dbus-run-session' to create a temporary bus for PipeWire to use
+    pw_cmd = "dbus-run-session -- pipewire & sleep 2 && wireplumber &"
+    subprocess.Popen(["bash", "-c", pw_cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
+    sleep(4) # Give WirePlumber enough time to find the Topping DX3
+
+    # 4. Final ALSA Bridge
+    log("INFO", "🌉 Bridging ALSA to PipeWire")
+    os.makedirs("/etc/alsa/conf.d", exist_ok=True)
+    with open("/etc/alsa/conf.d/99-pipewire-default.conf", "w") as f:
+        f.write('pcm.!default { type pipewire }\nctl.!default { type pipewire }\n')
 
 def main():
     role = os.getenv("ROLE", "server").lower()

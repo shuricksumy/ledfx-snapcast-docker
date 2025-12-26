@@ -14,7 +14,7 @@ RUN /ledfx/venv/bin/pip install --no-cache-dir sounddevice ledfx
 FROM debian:trixie-slim
 # Install everything needed for a standalone audio stack
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    alsa-utils dbus-daemon avahi-daemon libavahi-client3 \
+    alsa-utils dbus-daemon dbus-x11 avahi-daemon libavahi-client3 \
     libvorbis-dev libflac-dev libopus0 libsoxr0 libportaudio2 \
     python3 libpipewire-0.3-modules pipewire-bin pipewire-alsa wireplumber \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
