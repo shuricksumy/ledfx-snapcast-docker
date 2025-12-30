@@ -61,6 +61,7 @@ services:
       - SOUND_BACKEND=alsa
       - ALSA_DEVICE=plughw:DX5
       - CLIENT_ID=LivingRoom-DX5
+      #- EXTRA_ARGS=--some-arg value
     networks:
       - default
 ```
@@ -68,7 +69,7 @@ services:
 
 ## 🌈 Case 3: LedFx + Client (Visualizer)
 
-Starts the LedFx web engine and a hidden Snapclient. The client feeds audio into an ALSA Loopback device which LedFx "listens" to for light synchronization.
+Starts the LedFx web engine. The client feeds audio into an ALSA Loopback device which LedFx "listens" to for light synchronization.
 ```
 services:
   ledfx:
@@ -82,7 +83,6 @@ services:
       - "/dev/snd:/dev/snd"
     environment:
       - ROLE=ledfx
-      - HOST=192.168.111.111
       - LOOPBACK_NUMBER=10
 ```
 
@@ -106,6 +106,22 @@ Docker cannot load kernel modules. You must load the snd-aloop module on your Ho
    aplay -l | grep Loopback
 ```
 ---
+
+```
+services:
+  snapclient_ledfx:
+    image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
+    container_name: snapclient_ledfx
+    restart: unless-stopped
+    devices:
+      - "/dev/snd:/dev/snd"
+    environment:
+      - ROLE=client
+      - HOST=192.168.1.100  # Your Snapserver IP
+      - ALSA_DEVICE=hw:10,0 # Target the Loopback device
+      - CLIENT_ID=LedFx-Audio-Source
+      #- EXTRA_ARGS=--some-arg value
+```
 
 ## 🛠 Setup: PipeWire on Client Host
 

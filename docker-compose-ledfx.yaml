@@ -11,8 +11,6 @@ services:
       - "/dev/snd:/dev/snd"
     environment:
       - ROLE=ledfx
-      - HOST=192.168.111.111
-      - SOUND_BACKEND=alsa
       - LOOPBACK_NUMBER=10
      #- EXTRA_ARGS=--some-arg value
     networks:

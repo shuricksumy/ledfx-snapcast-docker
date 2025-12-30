@@ -8,6 +8,19 @@ networks:
     external: true  # Assuming this network already exists for your proxy
 
 services:
+  ledfx:
+    image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
+    container_name: ledfx_visualizer
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "8888:8888"
+    devices:
+      - "/dev/snd:/dev/snd"
+    environment:
+      - ROLE=ledfx
+      - LOOPBACK_NUMBER=10
+
   snapclient:
     image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
     container_name: snapclient
@@ -18,10 +31,8 @@ services:
       - ROLE=client
       - HOST=192.168.111.111
       - SOUND_BACKEND=alsa
-      - ALSA_DEVICE=plughw:DX5
-      - CLIENT_ID=DX5-SNAP
-      #- EXTRA_ARGS=--sampleformat 48000:24:*
-      # Removed UID/GID as they can interfere with ALSA access in some setups
+      - ALSA_DEVICE=hw:10,0
+      - CLIENT_ID=LedFx-Audio-Source
     networks:
       - default
       - npm_proxy
@@ -35,8 +46,8 @@ services:
       - /dev/snd:/dev/snd
     environment:
       - SQUEEZELITE_MODE=ALSA
-      - SQUEEZELITE_AUDIO_DEVICE=hw:CARD=DX5,DEV=0 
-      - SQUEEZELITE_NAME=DX5-Direct
+      - SQUEEZELITE_AUDIO_DEVICE=hw:CARD=10,DEV=0 
+      - SQUEEZELITE_NAME=LedFx-Audio-Source
       - SQUEEZELITE_SERVER_PORT=192.168.111.111:3483
       # Combined arguments properly
       - SQUEEZELITE_EXTRA_ARGS=-u V -X -C 5

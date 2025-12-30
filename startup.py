@@ -59,8 +59,6 @@ def list_alsa_devices():
 def main():
     role = os.getenv("ROLE", "server").lower()
     
-    # 🌍 MODERN URL LOGIC
-    # If HOST is empty, snapclient will use mDNS auto-discovery (tcp://_snapcast._tcp)
     host_raw = os.getenv("HOST", "").strip()
     host_uri = None
     if host_raw:
@@ -86,35 +84,14 @@ def main():
         cmd = ["snapclient", "--player", "alsa", "--soundcard", alsa_device]
         if client_id: cmd.extend(["--hostID", client_id])
         cmd.extend(extra_args)
-        if host_uri: cmd.append(host_uri) # URL as positional arg
+        if host_uri: cmd.append(host_uri)
         
         os.execv("/usr/bin/snapclient", cmd)
 
     elif "ledfx" in role:
-        playback_dev = f"hw:{loop_idx},0"
-        log("INFO", f"💡 ROLE: LEDFX + CLIENT (Bridge: hw:{loop_idx}) ➡️ Target: {host_uri or 'Auto-Discovery'}")
-        
+        log("INFO", f"💡 ROLE: LEDFX ONLY (Bridge: hw:{loop_idx})")
         setup_alsa_bridge(loop_idx)
         list_alsa_devices()
-        
-        # Start Internal Snapclient
-        snap_cmd = ["snapclient", "--player", "alsa", "--soundcard", playback_dev]
-        if client_id: snap_cmd.extend(["--hostID", f"{client_id}-ledfx"])
-        snap_cmd.extend(extra_args)
-        if host_uri: snap_cmd.append(host_uri)
-        
-        subprocess.Popen(snap_cmd)
-
-        log("INFO", f"⏳ Waiting for audio clock on card {loop_idx}...")
-        hw_params_path = f"/proc/asound/card{loop_idx}/pcm0p/sub0/hw_params"
-        for _ in range(20):
-            if os.path.exists(hw_params_path):
-                with open(hw_params_path, "r") as f:
-                    content = f.read()
-                    if "closed" not in content and "rate" in content:
-                        log("INFO", "✅ Audio detected! Starting LedFx...")
-                        break
-            sleep(1)
         
         ledfx_path = "/ledfx/venv/bin/ledfx"
         os.execv(ledfx_path, [ledfx_path, "--host", "0.0.0.0", "--port", "8888"])
