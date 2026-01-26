@@ -34,4 +34,7 @@ COPY snapserver.conf /etc/snapserver.conf
 COPY startup.py startup.py
 RUN chmod +x /startup.py
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD find /tmp/supervisor_health -mmin -0.5 || exit 1
+
 ENTRYPOINT ["python3", "-u", "/startup.py"]

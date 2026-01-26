@@ -26,7 +26,7 @@ def show_config(file_path):
 def cleanup():
     """Safely removes stale locks and socket files."""
     log("INFO", "🧹 Performing pre-start cleanup...")
-    paths = ["/tmp/.esd-*", "/tmp/pulse-*", "/var/run/dbus/pid"]
+    paths = ["/tmp/.esd-*", "/tmp/pulse-*", "/var/run/dbus/pid", "/tmp/supervisor_health"]
     for path_str in paths:
         try:
             base_dir = os.path.dirname(path_str)
@@ -62,6 +62,10 @@ def start_process(name, cmd):
     threading.Thread(target=stream_logs, args=(p, name), daemon=True).start()
     return p
 
+def update_health():
+    """Touches a health file for Docker healthchecks."""
+    Path("/tmp/supervisor_health").touch()
+
 def main():
     try:
         cleanup()
@@ -76,7 +80,7 @@ def main():
 
         commands = {}
 
-        # --- PREPARE COMMANDS BASED ON ROLE ---
+        # --- PREPARE COMMANDS ---
 
         if role == "snapserver":
             setup_fifos()
@@ -126,12 +130,12 @@ def main():
         log("INFO", "✅ All services running. Monitoring for crashes...")
 
         while True:
+            update_health()
             for name, p in active_procs.items():
                 status = p.poll()
                 if status is not None:
                     log("WARNING", f"⚠️ Service '{name}' stopped (Code: {status}). Restarting in 5s...")
                     time.sleep(5)
-                    # Use the original command stored in the commands dict
                     active_procs[name] = start_process(name, commands[name])
             
             time.sleep(2)
