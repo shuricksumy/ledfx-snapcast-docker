@@ -73,7 +73,6 @@ def main():
             config_file = "/config/snapserver.conf" if os.path.exists("/config/snapserver.conf") else "/etc/snapserver.conf"
             show_config(config_file)
             log("INFO", "🚀 Handing over to Snapserver (PID 1)")
-            # Replaces Python process with Snapserver
             os.execv("/usr/bin/snapserver", ["snapserver", "-c", config_file] + extra_args)
 
         # --- ROLE: SNAPCLIENT (Direct Execution) ---
@@ -86,30 +85,58 @@ def main():
         # --- ROLE: LEDFX-SUITE (Managed Multi-process) ---
         elif role == "ledfx-suite":
             log("INFO", "🌈 Mode: LedFx Suite (Pulse Bridge)")
+            
+            # Start PulseAudio
             subprocess.run(["pulseaudio", "--start", "--exit-idle-time=-1", "--disallow-exit"], check=False)
             with open("/etc/asound.conf", "w") as f:
                 f.write('pcm.!default { type pulse }\nctl.!default { type pulse }')
             
-            time.sleep(2)
+            # Use custom STARTUP_DELAY_SEC from your config
+            delay = int(os.getenv("STARTUP_DELAY_SEC", "2"))
+            if delay > 0:
+                log("INFO", f"⏱️ Waiting {delay}s for system readiness...")
+                time.sleep(delay)
+            else:
+                time.sleep(0.1) # Minimum breath
+
             commands = {}
+            
+            # 1. Snapclient (for LedFx Audio Input)
             if is_enabled("SNAPCLIENT_LEDFX_ENABLED"):
                 commands["snapclient"] = ["snapclient", "--player", "alsa", "--soundcard", "default", "--hostID", client_id, host_uri]
+            
+            # 2. Squeezelite (Restored and fully mapped)
             if is_enabled("SQUEEZELITE_LEDFX_ENABLED"):
                 sq_cmd = ["squeezelite", "-o", "default", "-n", os.getenv("SQUEEZELITE_NAME", "LedFx")]
-                if os.getenv("SQUEEZELITE_SERVER_PORT"): sq_cmd.extend(["-s", os.getenv("SQUEEZELITE_SERVER_PORT")])
+                
+                if os.getenv("SQUEEZELITE_SERVER_PORT"): 
+                    sq_cmd.extend(["-s", os.getenv("SQUEEZELITE_SERVER_PORT")])
+                
+                if os.getenv("SQUEEZELITE_MAC"): 
+                    sq_cmd.extend(["-m", os.getenv("SQUEEZELITE_MAC")])
+                
+                # Added support for SQUEEZELITE_EXTRA_ARGS (e.g. -W)
+                sq_extra = os.getenv("SQUEEZELITE_EXTRA_ARGS", "").split()
+                if sq_extra:
+                    sq_cmd.extend(sq_extra)
+                    
                 commands["squeezelite"] = sq_cmd
             
+            # 3. LedFx Core
             commands["ledfx"] = ["/ledfx/venv/bin/ledfx", "--host", "0.0.0.0", "--port", "8888"]
 
             active_procs = []
             for name, cmd in commands.items():
+                log("INFO", f"🚀 Starting {name}: {' '.join(cmd)}")
                 p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
                 threading.Thread(target=stream_logs, args=(p, name), daemon=True).start()
                 active_procs.append(p)
             
             while True:
                 for p in active_procs:
-                    if p.poll() is not None: sys.exit(1)
+                    if p.poll() is not None: 
+                        log("ERROR", "⚠️ A critical service has stopped. Exiting.")
+                        sys.exit(1)
                 time.sleep(5)
         
         else:
