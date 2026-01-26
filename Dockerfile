@@ -10,14 +10,16 @@ RUN /ledfx/venv/bin/pip install --no-cache-dir --upgrade pip wheel setuptools
 RUN /ledfx/venv/bin/pip install --no-cache-dir ledfx
 
 FROM debian:trixie-slim
+# Added pulseaudio and libasound2-plugins
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    alsa-utils dbus-daemon avahi-daemon \
+    alsa-utils libasound2-plugins pulseaudio-utils pulseaudio \
+    dbus-daemon avahi-daemon \
     libvorbis-dev libflac-dev libopus0 libsoxr0 \
     libasound2-dev libjack-dev portaudio19-dev libportaudio2 libsamplerate0-dev \
-    python3 && apt-get clean && rm -rf /var/lib/apt/lists/*
+    squeezelite python3 && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ARG TARGETARCH
-COPY pkg/snapclient_*_${TARGETARCH}_*.deb /tmp/snapclient.deb
+COPY pkg/snapclient_*_${TARGETARCH}_*_with-pulse.deb /tmp/snapclient.deb
 COPY pkg/snapserver_*_${TARGETARCH}_*.deb /tmp/snapserver.deb
 RUN apt-get update && apt-get install -y /tmp/snapclient.deb /tmp/snapserver.deb || apt-get install -y -f \
     && rm /tmp/*.deb && rm -rf /var/lib/apt/lists/*
@@ -27,7 +29,6 @@ ENV PATH="/ledfx/venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /
-# Ensure the config directory for volumes exists
 RUN mkdir -p /config
 COPY snapserver.conf /etc/snapserver.conf
 COPY startup.py startup.py

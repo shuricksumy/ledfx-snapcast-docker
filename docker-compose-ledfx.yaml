@@ -1,18 +1,31 @@
 version: '3.9'
 services:
-  ledfx:
-    image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
-    container_name: ledfx_visualizer
-    restart: unless-stopped
-    privileged: true      # Required for the script to start D-Bus/Avahi
-    ports:
-      - "8888:8888"       # LedFx Web UI
-    devices:
-      - "/dev/snd:/dev/snd"
-    environment:
-      - ROLE=ledfx
-      - LOOPBACK_NUMBER=10
-     #- EXTRA_ARGS=--some-arg value
-    networks:
-      - default
-      - npm_proxy
+    ledfx:
+      image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
+      container_name: ledfx-pipe
+      restart: unless-stopped
+      networks:
+        npm_proxy:
+            ipv4_address: $IP_LEDFX # You can specify a static IP
+      ports:
+        - "8889:8888" # ledfx web port
+      environment:
+        - ROLE=ledfx-suite
+        # --- Snapclient Config ---
+        - SNAP_HOST=192.168.111.111
+        - CLIENT_ID=LedFx
+        # --- Squeezelite Precise Config ---
+        - SQUEEZELITE_NAME=LedFx
+        - SQUEEZELITE_SERVER_PORT=192.168.111.111:3483
+        - SQUEEZELITE_MAC=72:23:90:63:08:12
+        - STARTUP_DELAY_SEC=0
+        - SQUEEZELITE_EXTRA_ARGS=-W
+        # Disable Squeezelite, keep Snapclient active
+        - SQUEEZELITE_LEDFX_ENABLED=true
+        - SNAPCLIENT_LEDFX_ENABLED=true
+      volumes:
+        - $DATA_DIR/ledfx:/root/.ledfx
+      labels:
+        - "wud.watch=true"
+        - "wud.tag.include=^latest$"
+        - "wud.watch.digest=true"

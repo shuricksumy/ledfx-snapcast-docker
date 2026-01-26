@@ -8,11 +8,11 @@ services:
     devices:
       - "/dev/snd:/dev/snd" # Access hardware cards
     environment:
-      - ROLE=client
-      - HOST=192.168.111.111
+      - ROLE=snapclient
+      - SNAP_HOST=192.168.111.111
       - SOUND_BACKEND=alsa
       - ALSA_DEVICE=plughw:DX5
-      - CLIENT_ID=DX5-SNAP
+      - SNAP_CLIENT_ID=DX5-SNAP
       # - EXTRA_ARGS=--sampleformat 48000:24:*
     networks:
       - default
