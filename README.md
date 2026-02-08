@@ -1,4 +1,4 @@
-# Docker Builder for Snapcast, Squeezelite, and LedFX
+# Docker Builder for [Snapcast](https://github.com/snapcast/snapcast), Squeezelite, and [LedFX](https://github.com/LedFx/LedFx)
 
 A high-performance, multi-arch (AMD64/ARM64) Docker image based on Debian 13 (Trixie). This image is uniquely optimized to handle synchronized audio visualization using a headless PulseAudio bridge, eliminating the need for complex ALSA Loopback configurations on the host.
 
