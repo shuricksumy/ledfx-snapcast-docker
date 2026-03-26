@@ -19,6 +19,7 @@ on:
     inputs:
       action:
         description: 'Choose action: push-main or release'
+        type: choice
         required: true
         default: push-main
         options:
@@ -79,6 +80,6 @@ jobs:
           file: ./Dockerfile
           push: true
           provenance: false
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64,linux/armhf
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
