@@ -104,7 +104,7 @@ def main():
                 time.sleep(delay)
 
             if is_enabled("SNAPCLIENT_LEDFX_ENABLED"):
-                commands["snapclient"] = ["snapclient", "--player", "alsa", "--soundcard", "default", "--hostID", client_id, host_uri]
+                commands["snapclient"] = ["snapclient", "--player", "pulse", "--soundcard", "default", "--hostID", client_id, host_uri]
             
             if is_enabled("SQUEEZELITE_LEDFX_ENABLED"):
                 sq_cmd = ["squeezelite", "-o", "pulse", "-n", os.getenv("SQUEEZELITE_NAME", "LedFx")]
