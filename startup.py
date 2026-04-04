@@ -107,7 +107,7 @@ def main():
                 commands["snapclient"] = ["snapclient", "--player", "alsa", "--soundcard", "default", "--hostID", client_id, host_uri]
             
             if is_enabled("SQUEEZELITE_LEDFX_ENABLED"):
-                sq_cmd = ["squeezelite", "-o", "default", "-n", os.getenv("SQUEEZELITE_NAME", "LedFx")]
+                sq_cmd = ["squeezelite", "-o", "pulse", "-n", os.getenv("SQUEEZELITE_NAME", "LedFx")]
                 if os.getenv("SQUEEZELITE_SERVER_PORT"): sq_cmd.extend(["-s", os.getenv("SQUEEZELITE_SERVER_PORT")])
                 if os.getenv("SQUEEZELITE_MAC"): sq_cmd.extend(["-m", os.getenv("SQUEEZELITE_MAC")])
                 

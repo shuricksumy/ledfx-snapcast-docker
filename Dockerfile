@@ -3,11 +3,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip python3-venv python3-dev python3-numpy \
     build-essential pkg-config cmake git \
     libasound2-dev libjack-dev portaudio19-dev libportaudio2 libsamplerate0-dev \
+    libflac-dev libasound2-dev libsoxr-dev libssl-dev libvorbis-dev libmad0-dev \
+    libfaad-dev libmpg123-dev libpulse-dev\
     && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /ledfx
 RUN python3 -m venv /ledfx/venv
 RUN /ledfx/venv/bin/pip install --no-cache-dir --upgrade pip wheel setuptools
 RUN /ledfx/venv/bin/pip install --no-cache-dir ledfx
+
+WORKDIR /build
+# Copy your local squeezelite source (submodule)
+COPY squeezelite/ .
+
+# Compile with optimized flags for high-end audio
+RUN make clean && \
+    make OPTS="-DLINUX -DALSA -DPULSE -DFLAC -DRESAMPLE -DSSL -DVISEXPORT -DDSD -DRESAMPLE_MP" \
+    LDADD="-lFLAC -lsoxr -lssl -lcrypto -lasound -lpulse -lpthread -lm -lrt"
+
+
 
 FROM debian:trixie-slim
 # Added pulseaudio and libasound2-plugins
@@ -16,7 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dbus-daemon avahi-daemon \
     libvorbis-dev libflac-dev libopus0 libsoxr0 \
     libasound2-dev libjack-dev portaudio19-dev libportaudio2 libsamplerate0-dev \
-    squeezelite python3 && apt-get clean && rm -rf /var/lib/apt/lists/*
+    python3 && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ARG TARGETARCH
 COPY pkg/snapclient_*_${TARGETARCH}_*_with-pulse.deb /tmp/snapclient.deb
@@ -25,6 +39,8 @@ RUN apt-get update && apt-get install -y /tmp/snapclient.deb /tmp/snapserver.deb
     && rm /tmp/*.deb && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /ledfx/venv /ledfx/venv
+COPY --from=builder /build/squeezelite /usr/local/bin/squeezelite
+
 ENV PATH="/ledfx/venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 

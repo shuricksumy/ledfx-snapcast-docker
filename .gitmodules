@@ -1,0 +1,3 @@
+[submodule "squeezelite"]
+	path = squeezelite
+	url = https://github.com/ralph-irving/squeezelite.git
