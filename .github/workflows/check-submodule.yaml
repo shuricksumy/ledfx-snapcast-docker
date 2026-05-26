@@ -24,7 +24,7 @@ jobs:
         id: check_changes
         run: |
           # Define your directories here
-          PATHS=("squeezelite" "squeezelite-orig")
+          PATHS=("squeezelite")
           CHANGES_FOUND="false"
           COMBINED_LOG=""
 
