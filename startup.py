@@ -3,28 +3,29 @@ import os, sys, subprocess, threading, time, shutil
 from pathlib import Path
 from datetime import datetime
 
+INIT_DELAY    = 5
+MAX_DELAY     = 60
+STABLE_RUN_S  = 30   # ran longer than this → reset backoff on next crash
+
 def log(level, msg):
-    """Internal supervisor logging."""
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [{level}]  ➡️  {msg}", flush=True)
 
 def is_enabled(env_var, default=True):
-    val = os.getenv(env_var, str(default)).lower()
-    return val in ("true", "1", "yes", "on")
+    return os.getenv(env_var, str(default)).lower() in ("true", "1", "yes", "on")
 
 def show_config(file_path):
-    """Prints the contents of a config file for debugging."""
     try:
         if os.path.exists(file_path):
             log("INFO", f"📄 Content of {file_path}:")
             print("-" * 40, flush=True)
-            with open(file_path, "r") as f:
+            with open(file_path) as f:
                 content = f.read()
                 print(content if content.strip() else "[Empty File]", flush=True)
             print("-" * 40, flush=True)
-    except Exception: pass
+    except Exception:
+        pass
 
 def cleanup():
-    """Safely removes stale locks and socket files."""
     log("INFO", "🧹 Performing pre-start cleanup...")
     paths = ["/tmp/.esd-*", "/tmp/pulse-*", "/var/run/dbus/pid", "/tmp/supervisor_health"]
     for path_str in paths:
@@ -34,10 +35,10 @@ def cleanup():
                 for item in Path(base_dir).glob(os.path.basename(path_str)):
                     if item.is_file(): item.unlink()
                     elif item.is_dir(): shutil.rmtree(item)
-        except Exception: pass
+        except Exception:
+            pass
 
 def setup_fifos():
-    """Ensures Snapserver pipes exist."""
     for pipe_name in ["snapfifo", "snapfifo_ledfx"]:
         path = f"/tmp/{pipe_name}"
         try:
@@ -49,38 +50,35 @@ def setup_fifos():
             log("ERROR", f"❌ Failed to setup FIFO {path}: {e}")
 
 def stream_logs(process, prefix):
-    """Managed logging for LedFx-Suite processes."""
     try:
         for line in iter(process.stdout.readline, ''):
-            if line: print(f"[{prefix}] {line.strip()}", flush=True)
-    except Exception: pass
+            if line:
+                print(f"[{prefix}] {line.strip()}", flush=True)
+    except Exception:
+        pass
 
 def start_process(name, cmd):
-    """Starts a process and returns the handle."""
     log("INFO", f"🚀 Starting {name}: {' '.join(cmd)}")
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
     threading.Thread(target=stream_logs, args=(p, name), daemon=True).start()
     return p
 
 def update_health():
-    """Touches a health file for Docker healthchecks."""
     Path("/tmp/supervisor_health").touch()
 
 def main():
     try:
         cleanup()
-        
-        role = os.getenv("ROLE", "ledfx-suite").lower()
+
+        role       = os.getenv("ROLE", "ledfx-suite").lower()
         extra_args = [a for a in os.getenv("EXTRA_ARGS", "").split() if a]
-        snap_host = os.getenv("SNAP_HOST", "127.0.0.1").strip()
-        host_uri = snap_host if "://" in snap_host else f"tcp://{snap_host}"
-        client_id = os.getenv("SNAP_CLIENT_ID", os.getenv("CLIENT_ID", "LedFx-Node"))
+        snap_host  = os.getenv("SNAP_HOST", "127.0.0.1").strip()
+        host_uri   = snap_host if "://" in snap_host else f"tcp://{snap_host}"
+        client_id  = os.getenv("SNAP_CLIENT_ID", os.getenv("CLIENT_ID", "LedFx-Node"))
 
         log("INFO", f"🛠️ System initialized for Role: {role.upper()}")
 
         commands = {}
-
-        # --- PREPARE COMMANDS ---
 
         if role == "snapserver":
             setup_fifos()
@@ -97,7 +95,7 @@ def main():
             subprocess.run(["pulseaudio", "--start", "--exit-idle-time=-1", "--disallow-exit"], check=False)
             with open("/etc/asound.conf", "w") as f:
                 f.write('pcm.!default { type pulse }\nctl.!default { type pulse }')
-            
+
             delay = int(os.getenv("STARTUP_DELAY_SEC", "2"))
             if delay > 0:
                 log("INFO", f"⏱️ Waiting {delay}s for system readiness...")
@@ -105,39 +103,64 @@ def main():
 
             if is_enabled("SNAPCLIENT_LEDFX_ENABLED"):
                 commands["snapclient"] = ["snapclient", "--player", "pulse", "--soundcard", "default", "--hostID", client_id, host_uri]
-            
+
             if is_enabled("SQUEEZELITE_LEDFX_ENABLED"):
                 sq_cmd = ["squeezelite", "-o", "pulse", "-n", os.getenv("SQUEEZELITE_NAME", "LedFx")]
                 if os.getenv("SQUEEZELITE_SERVER_PORT"): sq_cmd.extend(["-s", os.getenv("SQUEEZELITE_SERVER_PORT")])
-                if os.getenv("SQUEEZELITE_MAC"): sq_cmd.extend(["-m", os.getenv("SQUEEZELITE_MAC")])
-                
+                if os.getenv("SQUEEZELITE_MAC"):         sq_cmd.extend(["-m", os.getenv("SQUEEZELITE_MAC")])
                 sq_extra = os.getenv("SQUEEZELITE_EXTRA_ARGS", "").split()
                 if sq_extra: sq_cmd.extend(sq_extra)
                 commands["squeezelite"] = sq_cmd
-            
+
             commands["ledfx"] = ["/ledfx/venv/bin/ledfx", "--host", "0.0.0.0", "--port", "8888"]
-        
+
         else:
             log("ERROR", f"Unknown Role: {role}")
             sys.exit(1)
 
-        # --- EXECUTION & MONITORING ---
+        # --- LAUNCH ---
+        active_procs = {name: start_process(name, cmd) for name, cmd in commands.items()}
 
-        active_procs = {}
-        for name, cmd in commands.items():
-            active_procs[name] = start_process(name, cmd)
-        
+        # Per-service backoff state
+        # restart_at=None means the process is running (nothing scheduled)
+        svc_state = {
+            name: {"delay": INIT_DELAY, "restart_at": None, "started_at": time.monotonic()}
+            for name in commands
+        }
+
         log("INFO", "✅ All services running. Monitoring for crashes...")
 
         while True:
             update_health()
-            for name, p in active_procs.items():
-                status = p.poll()
-                if status is not None:
-                    log("WARNING", f"⚠️ Service '{name}' stopped (Code: {status}). Restarting in 5s...")
-                    time.sleep(5)
-                    active_procs[name] = start_process(name, commands[name])
-            
+            now = time.monotonic()
+
+            for name, p in list(active_procs.items()):
+                state = svc_state[name]
+                rc    = p.poll()
+
+                if rc is None:
+                    # Still running — reset backoff once it's been stable long enough
+                    if (now - state["started_at"]) > STABLE_RUN_S:
+                        state["delay"] = INIT_DELAY
+                    continue
+
+                # --- Process has exited ---
+                if state["restart_at"] is None:
+                    # First tick after exit — schedule restart
+                    run_time = now - state["started_at"]
+                    if run_time > STABLE_RUN_S:
+                        state["delay"] = INIT_DELAY  # stable run → reset before scheduling
+                    log("WARN", f"⚠️ '{name}' exited (code {rc}, ran {run_time:.0f}s). "
+                                f"Restarting in {state['delay']}s...")
+                    state["restart_at"] = now + state["delay"]
+                    state["delay"] = min(state["delay"] * 2, MAX_DELAY)
+
+                elif now >= state["restart_at"]:
+                    # Backoff elapsed — restart
+                    active_procs[name]   = start_process(name, commands[name])
+                    state["restart_at"]  = None
+                    state["started_at"]  = time.monotonic()
+
             time.sleep(2)
 
     except Exception as e:
