@@ -1,0 +1,37 @@
+name: GHCR package cleanup (dry run)
+
+# Manual-trigger only, dry-run only, for now. Replaces the old cleanup.yml (which only ever
+# deleted untagged package versions, via snok/container-retention-policy) -- build.yml tags every
+# push to main with a fresh short-sha tag, on top of latest/release tags, and nothing was cleaning
+# those up. Review this run's "would delete" log output in the Actions tab before flipping
+# `dry-run` to `false` and adding a `schedule:` trigger, same as the other repos -- release tags
+# here follow a project-specific LFX-v<ledfx-version>_SC-v<snapcast-version> format (e.g.
+# LFX-v2.1.5_SC-v0.34.0) rather than plain semver, so double check the preview doesn't catch a
+# real release tag in an unanticipated format before ever going live. Docker Hub
+# (shuricksumy/snapcast, also pushed by build.yml) is out of scope -- different registry/API,
+# not covered here.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old ghcr.io package versions
+        uses: dataaxiom/ghcr-cleanup-action@v1.2.2
+        with:
+          owner: shuricksumy
+          package: "ledfx-snapcast-docker"
+          # Keep `latest` and any release tag (LFX-v2.1.5_SC-v0.34.0, ...); delete every other tag
+          # (i.e. every short-sha build tag) plus orphaned untagged multi-arch layers. Flat
+          # alternation, no nested quantifiers -- a nested-quantifier pattern tripped this action's
+          # own ReDoS safety heuristic on every other repo this was set up on.
+          delete-tags: ".*"
+          exclude-tags: '^latest$|^LFX-v[0-9]+\.[0-9]+_SC-v[0-9]+\.[0-9]+$|^LFX-v[0-9]+\.[0-9]+\.[0-9]+_SC-v[0-9]+\.[0-9]+$|^LFX-v[0-9]+\.[0-9]+_SC-v[0-9]+\.[0-9]+\.[0-9]+$|^LFX-v[0-9]+\.[0-9]+\.[0-9]+_SC-v[0-9]+\.[0-9]+\.[0-9]+$'
+          use-regex: true
+          delete-untagged: true
+          dry-run: true
+          log-level: info
