@@ -72,7 +72,7 @@ jobs:
           echo "Multi-Arch Digests: ${{ env.multi-arch-digests }}"
 
       - name: Delete Untagged Package Versions
-        uses: snok/container-retention-policy@v3.0.0
+        uses: snok/container-retention-policy@v3.1.0
         with:
           account: user
           token: ${{ secrets.GHCR_PAT }}
