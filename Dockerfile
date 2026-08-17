@@ -59,9 +59,13 @@ RUN echo "cache epoch: ${REFRESH_WEEK}" && apt-get update && apt-get install -y 
 WORKDIR /ledfx
 # Pin with --build-arg LEDFX_VERSION=2.0.x for reproducible builds; empty = latest
 ARG LEDFX_VERSION=
+# watchdog is NOT a declared LedFx dependency: ledfx/utils.py pip-installs it
+# into its own venv on first run (import_or_install), which only ever worked
+# because the container ran as root. Install it here - an unprivileged user
+# cannot write to the venv, and RestApi.__init__ hard-fails without it.
 RUN python3 -m venv /ledfx/venv \
     && /ledfx/venv/bin/pip install --no-cache-dir --upgrade pip wheel setuptools \
-    && /ledfx/venv/bin/pip install --no-cache-dir "ledfx${LEDFX_VERSION:+==${LEDFX_VERSION}}"
+    && /ledfx/venv/bin/pip install --no-cache-dir "ledfx${LEDFX_VERSION:+==${LEDFX_VERSION}}" watchdog
 
 WORKDIR /build
 # Copy the upstream squeezelite source (submodule: ralph-irving/squeezelite)
@@ -113,6 +117,11 @@ RUN apt-get update \
 
 COPY --from=builder /ledfx/venv /ledfx/venv
 COPY --from=builder /build/squeezelite /usr/local/bin/squeezelite
+
+# The venv is root-owned and read-only to the runtime user, so anything LedFx
+# would otherwise install at first run has to be here already. sounddevice
+# also fails at import time if libportaudio is missing from this stage.
+RUN /ledfx/venv/bin/python -c "import watchdog.events, watchdog.observers, sounddevice"
 
 # Route ALSA clients through PulseAudio. Baked in at build time so the
 # container does not need write access to /etc at runtime.
