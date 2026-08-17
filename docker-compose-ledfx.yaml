@@ -31,7 +31,3 @@ services:
       volumes:
         # chown -R 1000:1000 $DATA_DIR/ledfx once after upgrading
         - $DATA_DIR/ledfx:/home/ledfx/.ledfx
-      labels:
-        - "wud.watch=true"
-        - "wud.tag.include=^latest$"
-        - "wud.watch.digest=true"
