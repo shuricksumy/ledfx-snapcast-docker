@@ -154,6 +154,14 @@ RUN ldd /usr/local/bin/squeezelite && \
 ENV PATH="/ledfx/venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 
+# squeezelite asks PulseAudio to pick the buffer (output_pulse.c sets every
+# pa_buffer_attr field to -1), and the server default target length is 2s -
+# which is exactly the lag against players that request their own. snapclient
+# asks for 100ms and stays in sync, so match it. libpulse reads this env var
+# when a stream does not specify its own attributes; raise it if the container
+# is starved for CPU and the audio breaks up.
+ENV PULSE_LATENCY_MSEC=100
+
 WORKDIR /
 COPY snapserver.conf /etc/snapserver.conf
 COPY startup.py /startup.py
