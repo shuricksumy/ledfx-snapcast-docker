@@ -26,7 +26,8 @@ A high-performance, multi-arch (AMD64/ARM64) Docker image based on Debian 13 (Tr
 | **SQUEEZELITE_MAC** | Fixed MAC address for persistent LMS settings | - |
 | **SQUEEZELITE_SERVER_PORT** | Direct `IP:Port` for LMS (skips discovery) | - |
 | **SQUEEZELITE_OUTPUT** | PulseAudio sink for Squeezelite (`default` = server default sink) | `default` |
-| **EXTRA_ARGS** | Raw flags passed to the primary binary of the role | - |
+| **FIFO_DIR** | Directory the `snapserver` role creates its named pipes in | `/tmp` |
+| **EXTRA_ARGS** | Raw flags passed to the primary binary of the role (`snapserver`, `snapclient`, or `ledfx`) | - |
 
 ---
 
@@ -87,7 +88,7 @@ services:
 ```
 
 ## 📦 Case 2: Standalone Snapserver
-Starts Snapserver and creates named pipes (/tmp/snapfifo and /tmp/snapfifo_ledfx) for external audio ingestion.
+Starts Snapserver and creates named pipes (`snapfifo` and `snapfifo_ledfx`) for external audio ingestion. They are created in `FIFO_DIR`, which defaults to `/tmp`; point it at a dedicated mounted directory so the host can write to them.
 
 ```YAML
 services:
@@ -98,10 +99,13 @@ services:
     network_mode: host
     environment:
       - ROLE=snapserver
+      - FIFO_DIR=/fifo
     user: "1000:1000" # chown -R 1000:1000 ${DATA_DIR}/snapserver/config
     volumes:
       - ${DATA_DIR}/snapserver/config:/config
-      - /tmp/snapfifo:/tmp
+      # Never mount over /tmp itself - the health file and PulseAudio's
+      # runtime dirs live there
+      - ${DATA_DIR}/snapserver/fifo:/fifo
 ```
 
 ## 🔈 Case 3: Hardware Player (ALSA / Direct DAC)

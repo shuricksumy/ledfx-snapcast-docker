@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-import os, sys, subprocess, threading, time, shutil
+import os, signal, sys, subprocess, threading, time, shutil
 from pathlib import Path
 from datetime import datetime
 
 INIT_DELAY    = 5
 MAX_DELAY     = 60
 STABLE_RUN_S  = 30   # ran longer than this → reset backoff on next crash
+STOP_GRACE_S  = 8    # time children get to exit before SIGKILL
+
+_shutdown = threading.Event()
 
 def log(level, msg):
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [{level}]  ➡️  {msg}", flush=True)
@@ -38,9 +41,9 @@ def cleanup():
         except Exception:
             pass
 
-def setup_fifos():
+def setup_fifos(fifo_dir):
     for pipe_name in ["snapfifo", "snapfifo_ledfx"]:
-        path = f"/tmp/{pipe_name}"
+        path = f"{fifo_dir}/{pipe_name}"
         try:
             if not os.path.exists(path):
                 log("INFO", f"📂 Creating Named Pipe at {path}")
@@ -66,8 +69,31 @@ def start_process(name, cmd):
 def update_health():
     Path("/tmp/supervisor_health").touch()
 
+def stop_children(active_procs):
+    """SIGTERM every child, then SIGKILL whatever is left after the grace period."""
+    # Reverse start order, so clients go down before the PulseAudio they use
+    ordered = list(active_procs.items())[::-1]
+    for name, p in ordered:
+        if p.poll() is None:
+            log("INFO", f"⏹️ Stopping {name}...")
+            p.terminate()
+    deadline = time.monotonic() + STOP_GRACE_S
+    for name, p in ordered:
+        try:
+            p.wait(timeout=max(0.1, deadline - time.monotonic()))
+        except subprocess.TimeoutExpired:
+            log("WARN", f"⚠️ '{name}' ignored SIGTERM, killing it")
+            p.kill()
+
+def handle_signal(signum, _frame):
+    log("INFO", f"📴 Caught {signal.Signals(signum).name}, shutting down...")
+    _shutdown.set()
+
 def main():
     try:
+        signal.signal(signal.SIGTERM, handle_signal)
+        signal.signal(signal.SIGINT, handle_signal)
+
         cleanup()
 
         role       = os.getenv("ROLE", "ledfx-suite").lower()
@@ -75,14 +101,24 @@ def main():
         snap_host  = os.getenv("SNAP_HOST", "127.0.0.1").strip()
         host_uri   = snap_host if "://" in snap_host else f"tcp://{snap_host}"
         client_id  = os.getenv("SNAP_CLIENT_ID", os.getenv("CLIENT_ID", "LedFx-Node"))
+        fifo_dir   = os.getenv("FIFO_DIR", "/tmp").rstrip("/") or "/tmp"
+        delay      = int(os.getenv("STARTUP_DELAY_SEC", "2"))
 
         log("INFO", f"🛠️ System initialized for Role: {role.upper()}")
 
         commands = {}
 
         if role == "snapserver":
-            setup_fifos()
+            setup_fifos(fifo_dir)
             config_file = "/config/snapserver.conf" if os.path.exists("/config/snapserver.conf") else "/etc/snapserver.conf"
+            if fifo_dir != "/tmp" and config_file == "/etc/snapserver.conf":
+                # The shipped config hardcodes /tmp, so retarget it rather than
+                # making FIFO_DIR require a hand-written snapserver.conf
+                rendered = "/tmp/snapserver.conf"
+                Path(rendered).write_text(
+                    Path(config_file).read_text().replace("/tmp/snapfifo", f"{fifo_dir}/snapfifo")
+                )
+                config_file = rendered
             show_config(config_file)
             commands["snapserver"] = ["snapserver", "-c", config_file] + extra_args
 
@@ -94,12 +130,12 @@ def main():
             log("INFO", "🌈 Mode: LedFx Suite (Pulse Bridge)")
             # /etc/asound.conf is baked into the image; the container runs
             # unprivileged and cannot write to /etc.
-            subprocess.run(["pulseaudio", "--start", "--exit-idle-time=-1", "--disallow-exit"], check=False)
-
-            delay = int(os.getenv("STARTUP_DELAY_SEC", "2"))
-            if delay > 0:
-                log("INFO", f"⏱️ Waiting {delay}s for system readiness...")
-                time.sleep(delay)
+            # PulseAudio is supervised like everything else: with --start it
+            # daemonized out of our sight, so nothing noticed when it died and
+            # every client crash-looped against a dead server. It is first in
+            # `commands` because the clients need it up before they connect.
+            commands["pulseaudio"] = ["pulseaudio", "--exit-idle-time=-1", "--disallow-exit",
+                                      "--log-target=stderr"]
 
             if is_enabled("SNAPCLIENT_LEDFX_ENABLED"):
                 commands["snapclient"] = ["snapclient", "--player", "pulse", "--soundcard", "default", "--hostID", client_id, host_uri]
@@ -115,14 +151,19 @@ def main():
                 if sq_extra: sq_cmd.extend(sq_extra)
                 commands["squeezelite"] = sq_cmd
 
-            commands["ledfx"] = ["/ledfx/venv/bin/ledfx", "--host", "0.0.0.0", "--port", "8888"]
+            commands["ledfx"] = ["/ledfx/venv/bin/ledfx", "--host", "0.0.0.0", "--port", "8888"] + extra_args
 
         else:
             log("ERROR", f"Unknown Role: {role}")
             sys.exit(1)
 
         # --- LAUNCH ---
-        active_procs = {name: start_process(name, cmd) for name, cmd in commands.items()}
+        active_procs = {}
+        for name, cmd in commands.items():
+            active_procs[name] = start_process(name, cmd)
+            if name == "pulseaudio" and delay > 0:
+                log("INFO", f"⏱️ Waiting {delay}s for PulseAudio readiness...")
+                time.sleep(delay)
 
         # Per-service backoff state
         # restart_at=None means the process is running (nothing scheduled)
@@ -133,8 +174,7 @@ def main():
 
         log("INFO", "✅ All services running. Monitoring for crashes...")
 
-        while True:
-            update_health()
+        while not _shutdown.is_set():
             now = time.monotonic()
 
             for name, p in list(active_procs.items()):
@@ -164,7 +204,18 @@ def main():
                     state["restart_at"]  = None
                     state["started_at"]  = time.monotonic()
 
-            time.sleep(2)
+            # Health tracks the services, not this loop. Touching it
+            # unconditionally reported "healthy" while a service crash-looped;
+            # requiring every service to be up and stable means the file goes
+            # stale and the container turns unhealthy instead.
+            if all(s["restart_at"] is None and (now - s["started_at"]) > STABLE_RUN_S
+                   for s in svc_state.values()):
+                update_health()
+
+            _shutdown.wait(2)
+
+        stop_children(active_procs)
+        log("INFO", "👋 All services stopped.")
 
     except Exception as e:
         log("ERROR", f"🛑 Global script crash: {e}")

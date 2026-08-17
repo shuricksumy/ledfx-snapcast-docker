@@ -127,6 +127,11 @@ RUN /ledfx/venv/bin/python -c "import watchdog.events, watchdog.observers, sound
 # container does not need write access to /etc at runtime.
 RUN printf 'pcm.!default { type pulse }\nctl.!default { type pulse }\n' > /etc/asound.conf
 
+# startup.py owns the PulseAudio daemon. Without this, a client that connects
+# while the supervised daemon is restarting would spawn a rival daemon, and the
+# supervised one would then fail to bind and crash-loop against it.
+RUN printf 'autospawn = no\n' >> /etc/pulse/client.conf
+
 # Verify the runtime image can actually satisfy squeezelite: libssl/libcrypto
 # and libpulse are linked directly, so a missing one stops the binary from
 # starting at all; the codecs are dlopen()ed and would fail only at play time.
@@ -152,7 +157,7 @@ COPY startup.py /startup.py
 # optional /dev/snd passthrough used by the snapclient role.
 RUN groupadd -g 1000 ledfx && \
     useradd -u 1000 -g 1000 -G audio -M -s /usr/sbin/nologin ledfx && \
-    install -d -o 1000 -g 1000 /home/ledfx /home/ledfx/.ledfx /config
+    install -d -o 1000 -g 1000 /home/ledfx /home/ledfx/.ledfx /config /fifo
 
 # PulseAudio and LedFx both keep state under $HOME, which must be writable
 ENV HOME=/home/ledfx
@@ -160,8 +165,9 @@ ENV HOME=/home/ledfx
 USER 1000:1000
 
 # find exits 0 whether or not anything matched, so the match itself has to be
-# tested - otherwise a stale health file still reports healthy
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+# tested - otherwise a stale health file still reports healthy. The start period
+# covers startup.py's stability window, which is when the file first appears.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD find /tmp/supervisor_health -mmin -1 | grep -q . || exit 1
 
 ENTRYPOINT ["python3", "-u", "/startup.py"]

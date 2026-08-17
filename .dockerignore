@@ -1,0 +1,6 @@
+.git
+**/.git
+.github
+*.md
+docker-compose-*.yaml
+build.sh

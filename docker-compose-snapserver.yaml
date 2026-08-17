@@ -12,8 +12,11 @@ services:
       - no-new-privileges:true
     environment:
       - ROLE=snapserver
+      - FIFO_DIR=/fifo # Where snapfifo/snapfifo_ledfx are created
       - EXTRA_ARGS=-v # Enable verbose logging for the server
     volumes:
       - ${DATA_DIR}/snapserver/config:/config
       - /etc/localtime:/etc/localtime:ro
-      - /tmp/snapfifo:/tmp
+      # Pipes live in FIFO_DIR. Do not mount over /tmp itself - the health file
+      # and PulseAudio's runtime dirs live there.
+      - ${DATA_DIR}/snapserver/fifo:/fifo

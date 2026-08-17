@@ -13,6 +13,9 @@ on:
     paths-ignore:
       - '.github/**'
       - '*.md'
+      # Not part of the image - editing them should not republish it
+      - 'docker-compose-*.yaml'
+      - 'build.sh'
   release:
     types: [published]
   # Rebuild weekly so Debian security updates, a new LedFx release and a new
