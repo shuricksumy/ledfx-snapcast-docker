@@ -15,6 +15,11 @@ on:
       - '*.md'
   release:
     types: [published]
+  # Rebuild weekly so Debian security updates, a new LedFx release and a new
+  # Snapcast release reach the published image without waiting for a commit
+  # (paths-ignore above only applies to push events)
+  schedule:
+    - cron: '0 4 * * 1'
   workflow_dispatch:
     inputs:
       action:
@@ -61,6 +66,23 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      # Snapcast .deb packages are pulled from the upstream release at build
+      # time. Resolving the tag here (authenticated) keeps the in-build API
+      # call off the anonymous rate limit and makes the version visible in the
+      # build log. REFRESH_WEEK changes every ISO week so the scheduled
+      # rebuild re-runs apt/pip instead of restoring a stale cache.
+      - name: Resolve build inputs
+        id: inputs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          snapcast="$(gh api repos/badaix/snapcast/releases/latest --jq .tag_name)"
+          week="$(date -u +%G-W%V)"
+          echo "snapcast_version=$snapcast" >> "$GITHUB_OUTPUT"
+          echo "refresh_week=$week" >> "$GITHUB_OUTPUT"
+          echo "Snapcast $snapcast | cache epoch $week"
+
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v6
@@ -82,6 +104,9 @@ jobs:
           push: true
           provenance: false
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            SNAPCAST_VERSION=${{ steps.inputs.outputs.snapcast_version }}
+            REFRESH_WEEK=${{ steps.inputs.outputs.refresh_week }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -90,9 +115,9 @@ jobs:
   scan:
     # The "Scan" the workflow's own name promises -- image_tag (above) was already being
     # computed for exactly this, but nothing ever consumed it. Scans the pushed GHCR image
-    # itself (base Debian packages, the vendored snapclient/snapserver .deb files, the
-    # pip-installed ledfx package), not just source, since that's where this repo's actual
-    # dependency surface lives. Public image, so no registry login needed to pull it here.
+    # itself (base Debian packages, the snapclient/snapserver .deb files fetched from the
+    # upstream release, the pip-installed ledfx package), not just source, since that's where
+    # this repo's actual dependency surface lives. Public image, so no login needed to pull.
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -106,6 +131,10 @@ jobs:
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
+          # Debian carries a large backlog of CVEs it has not patched; reporting
+          # them buries the ones we can actually act on (a rebuild picks up the
+          # fix). Only alert on vulnerabilities that have a fixed version.
+          ignore-unfixed: true
           exit-code: "0"
 
       - name: Upload Trivy results to the Security tab

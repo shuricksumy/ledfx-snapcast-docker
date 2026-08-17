@@ -25,7 +25,35 @@ A high-performance, multi-arch (AMD64/ARM64) Docker image based on Debian 13 (Tr
 | **SQUEEZELITE_NAME** | Name of the player as it appears in LMS | `LedFx` |
 | **SQUEEZELITE_MAC** | Fixed MAC address for persistent LMS settings | - |
 | **SQUEEZELITE_SERVER_PORT** | Direct `IP:Port` for LMS (skips discovery) | - |
+| **SQUEEZELITE_OUTPUT** | PulseAudio sink for Squeezelite (`default` = server default sink) | `default` |
 | **EXTRA_ARGS** | Raw flags passed to the primary binary of the role | - |
+
+---
+
+## 🔒 Running unprivileged
+
+The container **runs as UID/GID 1000**, not root. Two things follow from that:
+
+* Bind-mounted directories must be writable by that UID — `chown -R 1000:1000 <dir>` on the host, or override with `user: "<uid>:<gid>"` in compose.
+* The LedFx config now lives at **`/home/ledfx/.ledfx`**, not `/root/.ledfx`. If you are upgrading, move the mount and chown the host directory:
+
+```bash
+sudo chown -R 1000:1000 ./ledfx_config
+# volumes: - ./ledfx_config:/home/ledfx/.ledfx
+```
+
+For the `snapclient` role the image user is in the container's `audio` group (gid 29). If `/dev/snd` on your host is owned by a different gid, add it with `group_add`.
+
+---
+
+## ♻️ How the image stays current
+
+Nothing is vendored in this repo. Every build resolves its dependencies fresh:
+
+* **Snapcast** — `snapclient`/`snapserver` `.deb` packages are downloaded from the [upstream release](https://github.com/badaix/snapcast/releases) during the build and verified against the sha256 digest GitHub publishes for each asset. `--build-arg SNAPCAST_VERSION=v0.35.0` pins a specific release; the default `latest` follows upstream.
+* **LedFx** — installed from PyPI; `--build-arg LEDFX_VERSION=2.0.x` pins it.
+* **Squeezelite** — git submodule; the *Check and Update Submodules* workflow opens a PR when upstream moves.
+* **Debian base** — the image is rebuilt every Monday, and a Trivy scan (fixable CRITICAL/HIGH only) publishes to the repository's Security tab.
 
 ---
 
@@ -51,8 +79,11 @@ services:
       # Disable Squeezelite, keep Snapclient active
       - SQUEEZELITE_LEDFX_ENABLED=true
       - SNAPCLIENT_LEDFX_ENABLED=true
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
     volumes:
-      - ./ledfx_config:/root/.ledfx
+      - ./ledfx_config:/home/ledfx/.ledfx
 ```
 
 ## 📦 Case 2: Standalone Snapserver
@@ -67,6 +98,7 @@ services:
     network_mode: host
     environment:
       - ROLE=snapserver
+    user: "1000:1000" # chown -R 1000:1000 ${DATA_DIR}/snapserver/config
     volumes:
       - ${DATA_DIR}/snapserver/config:/config
       - /tmp/snapfifo:/tmp
@@ -81,6 +113,7 @@ services:
     image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
     container_name: snapclient_dx5
     restart: unless-stopped
+    user: "1000:1000"
     devices:
       - "/dev/snd:/dev/snd"
     environment:

@@ -5,8 +5,15 @@ services:
     image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
     container_name: snapclient_dx5
     restart: unless-stopped
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
     devices:
       - "/dev/snd:/dev/snd" # Access hardware cards
+    # The image user is already in the container's `audio` group (gid 29). If
+    # /dev/snd on your host is owned by a different gid, add it here:
+    # group_add:
+    #   - "995"
     environment:
       - ROLE=snapclient
       - SNAP_HOST=192.168.111.111

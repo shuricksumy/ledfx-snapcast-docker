@@ -21,8 +21,13 @@ fi
 docker buildx use multiarch-builder
 
 # Build multiarch image
+# Snapcast .deb packages are fetched from the upstream GitHub release during
+# the build; SNAPCAST_VERSION=latest resolves the newest one. Pin a tag
+# (e.g. v0.35.0) here if you need a reproducible build.
 docker buildx build \
     --platform $PLATFORMS \
+    --build-arg SNAPCAST_VERSION="${SNAPCAST_VERSION:-latest}" \
+    --build-arg REFRESH_WEEK="$(date -u +%G-W%V)" \
     -t $IMAGE_NAME:latest \
     -f $DOCKERFILE \
     --push .

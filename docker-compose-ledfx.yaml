@@ -4,6 +4,11 @@ services:
       image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
       container_name: ledfx-pipe
       restart: unless-stopped
+      # Image defaults to UID/GID 1000; override here if the host dir below is
+      # owned by a different user (the mount must be writable by this UID)
+      user: "1000:1000"
+      security_opt:
+        - no-new-privileges:true
       networks:
         npm_proxy:
             ipv4_address: $IP_LEDFX # You can specify a static IP
@@ -24,7 +29,8 @@ services:
         - SQUEEZELITE_LEDFX_ENABLED=true
         - SNAPCLIENT_LEDFX_ENABLED=true
       volumes:
-        - $DATA_DIR/ledfx:/root/.ledfx
+        # chown -R 1000:1000 $DATA_DIR/ledfx once after upgrading
+        - $DATA_DIR/ledfx:/home/ledfx/.ledfx
       labels:
         - "wud.watch=true"
         - "wud.tag.include=^latest$"

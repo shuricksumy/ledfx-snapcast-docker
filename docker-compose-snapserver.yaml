@@ -6,6 +6,10 @@ services:
     container_name: snapcast_audio
     restart: always
     network_mode: host
+    # chown -R 1000:1000 ${DATA_DIR}/snapserver/config once after upgrading
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
     environment:
       - ROLE=snapserver
       - EXTRA_ARGS=-v # Enable verbose logging for the server

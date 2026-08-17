@@ -27,7 +27,7 @@ def show_config(file_path):
 
 def cleanup():
     log("INFO", "🧹 Performing pre-start cleanup...")
-    paths = ["/tmp/.esd-*", "/tmp/pulse-*", "/var/run/dbus/pid", "/tmp/supervisor_health"]
+    paths = ["/tmp/.esd-*", "/tmp/pulse-*", "/tmp/supervisor_health"]
     for path_str in paths:
         try:
             base_dir = os.path.dirname(path_str)
@@ -92,9 +92,9 @@ def main():
 
         elif role == "ledfx-suite":
             log("INFO", "🌈 Mode: LedFx Suite (Pulse Bridge)")
+            # /etc/asound.conf is baked into the image; the container runs
+            # unprivileged and cannot write to /etc.
             subprocess.run(["pulseaudio", "--start", "--exit-idle-time=-1", "--disallow-exit"], check=False)
-            with open("/etc/asound.conf", "w") as f:
-                f.write('pcm.!default { type pulse }\nctl.!default { type pulse }')
 
             delay = int(os.getenv("STARTUP_DELAY_SEC", "2"))
             if delay > 0:
@@ -105,7 +105,10 @@ def main():
                 commands["snapclient"] = ["snapclient", "--player", "pulse", "--soundcard", "default", "--hostID", client_id, host_uri]
 
             if is_enabled("SQUEEZELITE_LEDFX_ENABLED"):
-                sq_cmd = ["squeezelite", "-o", "pulse", "-n", os.getenv("SQUEEZELITE_NAME", "LedFx")]
+                # squeezelite is built with the native PulseAudio backend, so -o
+                # takes a sink name ("default" = the server's default sink)
+                sq_output = os.getenv("SQUEEZELITE_OUTPUT", "default")
+                sq_cmd = ["squeezelite", "-o", sq_output, "-n", os.getenv("SQUEEZELITE_NAME", "LedFx")]
                 if os.getenv("SQUEEZELITE_SERVER_PORT"): sq_cmd.extend(["-s", os.getenv("SQUEEZELITE_SERVER_PORT")])
                 if os.getenv("SQUEEZELITE_MAC"):         sq_cmd.extend(["-m", os.getenv("SQUEEZELITE_MAC")])
                 sq_extra = os.getenv("SQUEEZELITE_EXTRA_ARGS", "").split()
