@@ -27,7 +27,7 @@ A high-performance, multi-arch (AMD64/ARM64) Docker image based on Debian 13 (Tr
 | **SQUEEZELITE_SERVER_PORT** | Direct `IP:Port` for LMS (skips discovery) | - |
 | **SQUEEZELITE_OUTPUT** | PulseAudio sink for Squeezelite (`default` = server default sink) | `default` |
 | **FIFO_DIR** | Directory the `snapserver` role creates its named pipes in | `/tmp` |
-| **PULSE_LATENCY_MSEC** | PulseAudio buffer for clients that don't request one (squeezelite). PulseAudio's own default is 2000 ms, which puts Squeezelite seconds behind synced players | `100` |
+| **PULSE_LATENCY_MSEC** | PulseAudio buffer for clients that don't request one (Squeezelite). Also sets how granular the sink monitor LedFx reads is — PulseAudio's own default of 2000 ms leaves Squeezelite seconds behind synced players and updates the effects only ~twice a second. Raise it only if a slow host breaks the audio up | `10` |
 | **EXTRA_ARGS** | Raw flags passed to the primary binary of the role (`snapserver`, `snapclient`, or `ledfx`) | - |
 
 ---

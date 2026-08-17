@@ -155,12 +155,14 @@ ENV PATH="/ledfx/venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 
 # squeezelite asks PulseAudio to pick the buffer (output_pulse.c sets every
-# pa_buffer_attr field to -1), and the server default target length is 2s -
-# which is exactly the lag against players that request their own. snapclient
-# asks for 100ms and stays in sync, so match it. libpulse reads this env var
-# when a stream does not specify its own attributes; raise it if the container
-# is starved for CPU and the audio breaks up.
-ENV PULSE_LATENCY_MSEC=100
+# pa_buffer_attr field to -1) and the server default target length is 2s.
+# PulseAudio sizes a sink's render interval to suit its streams, so that
+# default does not merely delay playback: LedFx reads the sink monitor, and a
+# coarse buffer delivers audio in lumps - measured at 1000ms, the effects
+# update about twice a second. 10ms keeps the monitor feed continuous, below
+# LedFx's own ~16ms frame interval. Raising it costs visualisation smoothness,
+# not just latency; raise it only if a slow host breaks the audio up.
+ENV PULSE_LATENCY_MSEC=10
 
 WORKDIR /
 COPY snapserver.conf /etc/snapserver.conf
