@@ -65,7 +65,8 @@ ARG LEDFX_VERSION=
 # cannot write to the venv, and RestApi.__init__ hard-fails without it.
 RUN python3 -m venv /ledfx/venv \
     && /ledfx/venv/bin/pip install --no-cache-dir --upgrade pip wheel setuptools \
-    && /ledfx/venv/bin/pip install --no-cache-dir "ledfx${LEDFX_VERSION:+==${LEDFX_VERSION}}" watchdog
+    && /ledfx/venv/bin/pip install --no-cache-dir "ledfx${LEDFX_VERSION:+==${LEDFX_VERSION}}" watchdog \
+    && /ledfx/venv/bin/pip install --no-cache-dir --upgrade "setuptools>=78.1.1" "msgpack>=1.2.1"
 
 WORKDIR /build
 # Copy the upstream squeezelite source (submodule: ralph-irving/squeezelite)
@@ -103,7 +104,11 @@ ARG REFRESH_WEEK=0
 
 # Runtime shared libraries only - no -dev packages, no toolchain. The codecs
 # below are dlopen()ed by soname, so a missing one fails silently at play time.
-RUN echo "cache epoch: ${REFRESH_WEEK}" && apt-get update && apt-get install -y --no-install-recommends \
+# apt-get upgrade applies security updates already in the archive but not yet
+# in the base image; without it those CVEs sit in the scan until Debian respins
+# debian:trixie-slim. REFRESH_WEEK already re-runs this layer weekly.
+RUN echo "cache epoch: ${REFRESH_WEEK}" && apt-get update && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
     pulseaudio pulseaudio-utils libasound2-plugins alsa-utils \
     libflac14 libvorbisfile3 libmad0 libfaad2 libmpg123-0 libopusfile0 \
     libsoxr0 libssl3 libasound2 libportaudio2 libsamplerate0 \
@@ -121,7 +126,10 @@ COPY --from=builder /build/squeezelite /usr/local/bin/squeezelite
 # The venv is root-owned and read-only to the runtime user, so anything LedFx
 # would otherwise install at first run has to be here already. sounddevice
 # also fails at import time if libportaudio is missing from this stage.
-RUN /ledfx/venv/bin/python -c "import watchdog.events, watchdog.observers, sounddevice"
+# ledfx.__main__ pulls in core, config and utils, so it exercises the real
+# import graph - a dependency upgrade that breaks LedFx fails here, not on the
+# user's first start. (setup_sentry() is only called, never run at import.)
+RUN /ledfx/venv/bin/python -c "import watchdog.events, watchdog.observers, sounddevice, ledfx.__main__"
 
 # Route ALSA clients through PulseAudio. Baked in at build time so the
 # container does not need write access to /etc at runtime.
