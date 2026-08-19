@@ -1,17 +1,23 @@
 name: GHCR package cleanup
 
-# Manual-trigger only, dry-run only, for now. Replaces the old cleanup.yml (which only ever
-# deleted untagged package versions, via snok/container-retention-policy) -- build.yml tags every
-# push to main with a fresh short-sha tag, on top of latest/release tags, and nothing was cleaning
-# those up. Review this run's "would delete" log output in the Actions tab before flipping
-# `dry-run` to `false` and adding a `schedule:` trigger, same as the other repos -- release tags
-# here follow a project-specific LFX-v<ledfx-version>_SC-v<snapcast-version> format (e.g.
-# LFX-v2.1.5_SC-v0.34.0) rather than plain semver, so double check the preview doesn't catch a
-# real release tag in an unanticipated format before ever going live. Docker Hub
-# (shuricksumy/snapcast, also pushed by build.yml) is out of scope -- different registry/API,
-# not covered here.
+# build.yml publishes exactly two kinds of tag that are meant to last: `latest`
+# (newest main build) and release tags. Everything else - the short-sha tags
+# from manual test builds, and untagged multi-arch leftovers - is disposable
+# and gets reaped here.
+#
+# Docker Hub (shuricksumy/snapcast, also pushed by build.yml) is out of scope:
+# different registry and API, not covered by this action.
 on:
-  workflow_dispatch: {}
+  schedule:
+    # Monday 05:00 UTC, an hour after the weekly rebuild in build.yml
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Preview only - log what would be deleted, delete nothing'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   packages: write
@@ -25,13 +31,15 @@ jobs:
         with:
           owner: shuricksumy
           package: "ledfx-snapcast-docker"
-          # Keep `latest` and any release tag (LFX-v2.1.5_SC-v0.34.0, ...); delete every other tag
-          # (i.e. every short-sha build tag) plus orphaned untagged multi-arch layers. Flat
-          # alternation, no nested quantifiers -- a nested-quantifier pattern tripped this action's
-          # own ReDoS safety heuristic on every other repo this was set up on.
+          # Delete every tag except the ones below, plus orphaned untagged
+          # layers. Kept: `latest`; semver release tags in every width the
+          # build publishes (1, 1.0, 1.0.0, and the v-prefixed ref tag); and
+          # the historical LFX-v<ledfx>_SC-v<snapcast> releases from before
+          # v1.0.0. Flat alternation, no nested quantifiers - a nested
+          # quantifier trips this action's own ReDoS safety heuristic.
           delete-tags: ".*"
-          exclude-tags: '^latest$|^LFX-v[0-9]+\.[0-9]+_SC-v[0-9]+\.[0-9]+$|^LFX-v[0-9]+\.[0-9]+\.[0-9]+_SC-v[0-9]+\.[0-9]+$|^LFX-v[0-9]+\.[0-9]+_SC-v[0-9]+\.[0-9]+\.[0-9]+$|^LFX-v[0-9]+\.[0-9]+\.[0-9]+_SC-v[0-9]+\.[0-9]+\.[0-9]+$'
+          exclude-tags: '^latest$|^v?[0-9]+$|^v?[0-9]+\.[0-9]+$|^v?[0-9]+\.[0-9]+\.[0-9]+$|^LFX-v[0-9]+\.[0-9]+_SC-v[0-9]+\.[0-9]+$|^LFX-v[0-9]+\.[0-9]+\.[0-9]+_SC-v[0-9]+\.[0-9]+$|^LFX-v[0-9]+\.[0-9]+_SC-v[0-9]+\.[0-9]+\.[0-9]+$|^LFX-v[0-9]+\.[0-9]+\.[0-9]+_SC-v[0-9]+\.[0-9]+\.[0-9]+$'
           use-regex: true
           delete-untagged: true
-          dry-run: false
+          dry-run: ${{ inputs.dry-run || false }}
           log-level: info

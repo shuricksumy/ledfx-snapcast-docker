@@ -23,19 +23,9 @@ on:
   # (paths-ignore above only applies to push events)
   schedule:
     - cron: '0 4 * * 1'
-  workflow_dispatch:
-    inputs:
-      action:
-        description: 'Choose action: push-main or release'
-        type: choice
-        required: true
-        default: push-main
-        options:
-          - push-main
-          - release
-      tag_name:
-        description: 'Release tag name (required for release)'
-        required: false
+  # Rebuilds and republishes whatever the current ref implies: `latest` from
+  # main, a sha tag from any other branch. Releases are cut as GitHub releases.
+  workflow_dispatch: {}
 
 jobs:
   build:
@@ -101,8 +91,9 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=raw,value=${{ github.event.inputs.tag_name }},enable=${{ github.event.inputs.action == 'release' }}
-            type=sha,format=short
+            # Test builds off a branch need some tag or the push fails; the
+            # cleanup workflow reaps these. main and releases never get one.
+            type=sha,format=short,enable=${{ github.event_name == 'workflow_dispatch' && github.ref_name != github.event.repository.default_branch }}
             
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v7
