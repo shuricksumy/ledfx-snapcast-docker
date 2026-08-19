@@ -31,6 +31,12 @@ jobs:
         with:
           owner: shuricksumy
           package: "ledfx-snapcast-docker"
+          # The package is user-scoped (/users/shuricksumy/packages/...), and a
+          # repository GITHUB_TOKEN cannot delete those - the API answers 404,
+          # which this action logs as "already deleted" and counts as a success,
+          # so the run goes green having deleted nothing. Needs a PAT carrying
+          # delete:packages.
+          token: ${{ secrets.GHCR_PAT }}
           # Delete every tag except the ones below, plus orphaned untagged
           # layers. Kept: `latest`; semver release tags at any width the build
           # publishes (1, 1.0, 1.0.0, v1.0.0); and the historical
