@@ -1,6 +1,65 @@
-# Docker Builder for [Snapcast](https://github.com/snapcast/snapcast), Squeezelite, and [LedFX](https://github.com/LedFx/LedFx)
+# LedFx · Snapcast · Squeezelite
 
-A high-performance, multi-arch (AMD64/ARM64) Docker image based on Debian 13 (Trixie). This image is uniquely optimized to handle synchronized audio visualization using a headless PulseAudio bridge, eliminating the need for complex ALSA Loopback configurations on the host.
+[![Build_Push_Scan](https://github.com/shuricksumy/ledfx-snapcast-docker/actions/workflows/build.yml/badge.svg)](https://github.com/shuricksumy/ledfx-snapcast-docker/actions/workflows/build.yml)
+
+A multi-arch (amd64/arm64) Docker image on Debian 13 (Trixie) that makes your LEDs dance to whatever [**Music Assistant**](https://www.music-assistant.io/) is playing — with no sound card, no `snd-aloop`, and nothing installed on the host.
+
+## 🎯 Why this exists
+
+[**Music Assistant**](https://www.music-assistant.io/) is the library and streaming brain — Spotify, Plex, local files, radio — and Home Assistant drives it. [**LedFx**](https://ledfx.app/) is the other half of the fun: it turns music into real-time effects on WLED strips and E1.31 controllers.
+
+The problem is in between. **LedFx has to *hear* the music**, and it does that by opening an audio input device. On a headless server, or inside Docker, there is no sound card to open — so the usual advice is to load the `snd-aloop` kernel module on the host, wire an ALSA loopback, and hope the routing survives a reboot.
+
+**This image removes that whole layer.** It runs a headless PulseAudio *inside* the container and plugs a Music Assistant player straight into it — [Squeezelite](https://github.com/ralph-irving/squeezelite), [Snapclient](https://github.com/snapcast/snapcast), or both at once. LedFx listens to that sink's monitor. The host never knows any of it is happening.
+
+```mermaid
+flowchart LR
+    subgraph MA["🎵 Music Assistant"]
+        LIB["Spotify · Plex<br/>local library · radio"]
+        LIB --> SQP["Squeezelite provider<br/>slimproto :3483"]
+        LIB --> SNP["Snapcast provider<br/>:1704"]
+    end
+
+    subgraph IMG["🐳 this image — ROLE=ledfx-suite"]
+        SQ["squeezelite"] --> PA["headless<br/>PulseAudio"]
+        SC["snapclient"] --> PA
+        PA --> LX["LedFx<br/>:8888"]
+    end
+
+    SQP --> SQ
+    SNP --> SC
+    LX --> LED["💡 WLED · E1.31<br/>LED strips"]
+    SNP -. "same audio, other rooms" .-> ROOMS["kitchen · lounge<br/>real speakers"]
+
+    style IMG stroke-width:3px
+```
+
+## 🎛️ Use it with Music Assistant
+
+Add the container as a player, group it with your real speakers, and the LEDs follow the house. Both routes work at the same time — pick per source, or run both and disable one.
+
+**Squeezelite — the flexible one.** Music Assistant ships a full SlimProto implementation as its [Squeezelite provider](https://www.music-assistant.io/player-support/squeezelite/), and it renegotiates to each track's native sample rate (44.1 kHz stays 44.1 kHz). Add the provider in `SETTINGS → PLAYER PROVIDERS → ADD A NEW PROVIDER → Squeezelite`, then point this container at the MA host:
+
+```yaml
+environment:
+  - ROLE=ledfx-suite
+  - SQUEEZELITE_NAME=Squeez-LedFx          # the name you will see in MA
+  - SQUEEZELITE_SERVER_PORT=192.168.1.50:3483   # your Music Assistant host
+  - SQUEEZELITE_MAC=72:23:98:63:08:13      # fixed MAC = stable player identity
+```
+
+**Snapcast — the synchronised one.** MA's [Snapcast provider](https://www.music-assistant.io/player-support/snapcast/) ships a built-in Snapserver and keeps every room sample-accurate, at one fixed rate for all clients (48 kHz by default):
+
+```yaml
+environment:
+  - ROLE=ledfx-suite
+  - SNAP_HOST=192.168.1.50                 # your Music Assistant host
+  - SNAP_CLIENT_ID=Snap-LedFx
+```
+
+LedFx is then on port `8888` — add your WLED devices there, pick an effect, and press play in Music Assistant.
+
+> **If the LEDs run slightly ahead of the speakers**, that is the container's ~10 ms audio path beating a real DAC's output latency. Trim it with the per-player sync offset in Music Assistant or LMS. `PULSE_LATENCY_MSEC` controls the other direction — see [Environment Variables](#-environment-variables).
 
 ---
 
@@ -8,7 +67,7 @@ A high-performance, multi-arch (AMD64/ARM64) Docker image based on Debian 13 (Tr
 
 * **ledfx-suite**: The "All-in-One" visualizer. Runs PulseAudio, Squeezelite, Snapclient, and LedFx. Audio is routed internally via a virtual Pulse sink.
 * **snapserver**: Runs a standalone Snapserver with support for Named Pipes (FIFOs).
-* **client**: A dedicated hardware player. Runs Snapclient with direct ALSA access for physical DACs (e.g., Topping DX5).
+* **snapclient**: A dedicated hardware player. Runs Snapclient with direct ALSA access for physical DACs (e.g., Topping DX5).
 
 ---
 
@@ -61,9 +120,7 @@ Nothing is vendored in this repo. Every build resolves its dependencies fresh:
 
 ## 📡 Case 1: LedFx Suite (The All-in-One Visualizer)
 
-This role starts a local PulseAudio server and routes both Squeezelite and Snapclient into a virtual "LedFx_Sink". LedFx then "listens" to the monitor of this sink. **No host kernel modules (snd-aloop) required.**
-
-[Image of PulseAudio network streaming architecture]
+This role starts a headless PulseAudio server and routes both Squeezelite and Snapclient into it. With no sound card present PulseAudio provides a dummy sink, and LedFx listens to that sink's monitor. **No host kernel modules (snd-aloop) required.**
 
 ```yaml
 services:
