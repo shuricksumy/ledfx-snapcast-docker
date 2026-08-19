@@ -32,13 +32,16 @@ jobs:
           owner: shuricksumy
           package: "ledfx-snapcast-docker"
           # Delete every tag except the ones below, plus orphaned untagged
-          # layers. Kept: `latest`; semver release tags in every width the
-          # build publishes (1, 1.0, 1.0.0, and the v-prefixed ref tag); and
-          # the historical LFX-v<ledfx>_SC-v<snapcast> releases from before
-          # v1.0.0. Flat alternation, no nested quantifiers - a nested
-          # quantifier trips this action's own ReDoS safety heuristic.
+          # layers. Kept: `latest`; semver release tags at any width the build
+          # publishes (1, 1.0, 1.0.0, v1.0.0); and the historical
+          # LFX-v<ledfx>_SC-v<snapcast> releases from before v1.0.0.
+          # This action rejects a pattern whose alternatives share a prefix
+          # ("ambiguous alternation") as well as nested quantifiers, so each
+          # alternative below starts with a distinct character and matches all
+          # widths with one character class. [0-9.]+ is deliberately loose:
+          # erring wide only ever keeps a tag, it can never delete a release.
           delete-tags: ".*"
-          exclude-tags: '^latest$|^v?[0-9]+$|^v?[0-9]+\.[0-9]+$|^v?[0-9]+\.[0-9]+\.[0-9]+$|^LFX-v[0-9]+\.[0-9]+_SC-v[0-9]+\.[0-9]+$|^LFX-v[0-9]+\.[0-9]+\.[0-9]+_SC-v[0-9]+\.[0-9]+$|^LFX-v[0-9]+\.[0-9]+_SC-v[0-9]+\.[0-9]+\.[0-9]+$|^LFX-v[0-9]+\.[0-9]+\.[0-9]+_SC-v[0-9]+\.[0-9]+\.[0-9]+$'
+          exclude-tags: '^latest$|^v?[0-9.]+$|^LFX-v[0-9.]+_SC-v[0-9.]+$'
           use-regex: true
           delete-untagged: true
           dry-run: ${{ inputs.dry-run || false }}
