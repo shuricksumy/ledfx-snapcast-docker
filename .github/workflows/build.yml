@@ -96,6 +96,11 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=tag
+            # A vX.Y.Z release also publishes the rolling X.Y and X tags, so
+            # users can pin as loosely or as tightly as they want
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
             type=raw,value=${{ github.event.inputs.tag_name }},enable=${{ github.event.inputs.action == 'release' }}
             type=sha,format=short
             
