@@ -1,5 +1,7 @@
 # LedFx · Snapcast · Squeezelite
 
+> **Part of the [Home Audio Stack](https://github.com/shuricksumy/home-audio-stack)** — Music Assistant → Snapcast → PipeWire, into USB DACs, Bluetooth speakers and LED strips. That page maps how these projects fit together.
+
 [![Build_Push_Scan](https://github.com/shuricksumy/ledfx-snapcast-docker/actions/workflows/build.yml/badge.svg)](https://github.com/shuricksumy/ledfx-snapcast-docker/actions/workflows/build.yml)
 
 A multi-arch (amd64/arm64) Docker image on Debian 13 (Trixie) that makes your LEDs dance to whatever [**Music Assistant**](https://www.music-assistant.io/) is playing — with no sound card, no `snd-aloop`, and nothing installed on the host.
