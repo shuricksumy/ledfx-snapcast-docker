@@ -6,6 +6,17 @@
 
 A multi-arch (amd64/arm64) Docker image on Debian 13 (Trixie) that makes your LEDs dance to whatever [**Music Assistant**](https://www.music-assistant.io/) is playing — with no sound card, no `snd-aloop`, and nothing installed on the host.
 
+## ✨ What you get
+
+|  | |
+| :-- | :-- |
+| 💡 **The room becomes the party** | Strips and matrices react to whatever is playing anywhere in the house. |
+| 🚫 **No `snd-aloop`, no sound card** | Everything happens inside the container. The host is not modified at all. |
+| 🎛️ **Three roles, one image** | All-in-one visualiser, a standalone Snapserver, or a hardware ALSA player. |
+| 🔌 **Both transports** | A Squeezelite player and a Snapcast client can feed it, together or separately. |
+
+**Running more than one room?** The [Home Audio Stack](https://github.com/shuricksumy/home-audio-stack) has a [complete compose file](https://github.com/shuricksumy/home-audio-stack/tree/main/examples) with this image alongside the others.
+
 ## 🎯 Why this exists
 
 [**Music Assistant**](https://www.music-assistant.io/) is the library and streaming brain — Spotify, Plex, local files, radio — and Home Assistant drives it. [**LedFx**](https://ledfx.app/) is the other half of the fun: it turns music into real-time effects on WLED strips and E1.31 controllers.
