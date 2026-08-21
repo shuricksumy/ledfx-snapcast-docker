@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LedFx · Snapcast panel</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --fg: #16181d; --muted: #6b7280; --card: #fff;
+    --line: #e3e6ea; --accent: #2563eb; --ok: #128a5b; --warn: #b45309; --bad: #b91c1c;
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161a; --fg: #e8eaed; --muted: #9aa1ab; --card: #1c1f25;
+    --line: #2b3039; --accent: #60a5fa; --ok: #34d399; --warn: #fbbf24; --bad: #f87171;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14161a; --fg: #e8eaed; --muted: #9aa1ab; --card: #1c1f25;
+      --line: #2b3039; --accent: #60a5fa; --ok: #34d399; --warn: #fbbf24; --bad: #f87171;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: .6rem; padding: .8rem 1rem; border-bottom: 1px solid var(--line); background: var(--card); }
+  header h1 { font-size: 1rem; margin: 0; font-weight: 650; }
+  header .grow { flex: 1; }
+  .badge { font-size: .72rem; padding: .12rem .45rem; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .badge.ok { color: var(--ok); border-color: currentColor; }
+  .badge.bad { color: var(--bad); border-color: currentColor; }
+  main { padding: 1rem; max-width: 1100px; margin: 0 auto; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th, td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid var(--line); font-size: .88rem; vertical-align: middle; }
+  th { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  /* One long command or status line would otherwise stretch the table and put
+     a horizontal scrollbar under every row. Clamp it; title= carries the rest. */
+  .clamp { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  td.cmd { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .78rem; }
+  .state { font-weight: 600; }
+  .state.running { color: var(--ok); }
+  .state.stopped { color: var(--muted); }
+  .state.backoff, .state.starting { color: var(--warn); }
+  button { font: inherit; font-size: .82rem; padding: .3rem .6rem; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  .acts { display: flex; gap: .3rem; flex-wrap: wrap; }
+  dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--fg); padding: 0; width: min(680px, 94vw); }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  .dlg-head { display: flex; align-items: center; gap: .5rem; padding: .7rem .9rem; border-bottom: 1px solid var(--line); }
+  .dlg-head h2 { font-size: .95rem; margin: 0; flex: 1; }
+  .dlg-body { padding: .9rem; max-height: 65vh; overflow: auto; }
+  .dlg-foot { display: flex; justify-content: flex-end; gap: .4rem; padding: .7rem .9rem; border-top: 1px solid var(--line); }
+  label { display: block; margin-bottom: .65rem; font-size: .8rem; color: var(--muted); }
+  label input[type=text], label input[type=number] { display: block; width: 100%; margin-top: .2rem; padding: .4rem .5rem; font: inherit; font-size: .86rem; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); }
+  label.inline { display: flex; align-items: center; gap: .45rem; }
+  pre#logBody { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .76rem; white-space: pre-wrap; word-break: break-word; }
+  .err { color: var(--bad); font-size: .82rem; margin: 0 0 .6rem; }
+  .hint { color: var(--muted); font-size: .76rem; margin: .1rem 0 .9rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>LedFx · Snapcast</h1>
+  <span id="role" class="badge"></span>
+  <span id="health" class="badge"></span>
+  <span class="grow"></span>
+  <button id="ledfxLink" hidden>Open LedFx</button>
+  <button id="settingsBtn">⚙ Parameters</button>
+  <button id="themeBtn" title="theme">🌗</button>
+</header>
+
+<main>
+  <div class="card">
+    <table>
+      <colgroup>
+        <col style="width:18%"><col style="width:13%"><col style="width:10%">
+        <col style="width:9%"><col style="width:26%"><col style="width:24%">
+      </colgroup>
+      <thead><tr>
+        <th>Service</th><th>State</th><th>Uptime</th><th>Restarts</th><th>Command</th><th></th>
+      </tr></thead>
+      <tbody id="rows"><tr><td colspan="6">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</main>
+
+<dialog id="logDialog">
+  <div class="dlg-head"><h2 id="logTitle">Logs</h2><button data-close>Close</button></div>
+  <div class="dlg-body"><pre id="logBody"></pre></div>
+</dialog>
+
+<dialog id="cfgDialog">
+  <div class="dlg-head"><h2>Parameters</h2><button data-close>Close</button></div>
+  <div class="dlg-body">
+    <p id="cfgErr" class="err" hidden></p>
+    <div id="cfgBody"></div>
+  </div>
+  <div class="dlg-foot">
+    <button id="cfgReset" title="discard the stored file and go back to the container's environment variables">Reset to env</button>
+    <button id="cfgSave">Save &amp; apply</button>
+  </div>
+</dialog>
+
+<script>
+// Home Assistant Ingress serves this page under a path prefix it strips from
+// requests, so every call has to be relative to the document. An absolute
+// "/api/..." would escape the prefix and 404.
+const BASE = document.baseURI.replace(/[^/]*$/, "");
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => (
+  { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function api(path, options) {
+  const res = await fetch(BASE + path, options);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || res.statusText);
+  return body;
+}
+
+const fmtUptime = s => {
+  s = Math.floor(s || 0);
+  if (s < 60) return s + "s";
+  if (s < 3600) return Math.floor(s / 60) + "m " + (s % 60) + "s";
+  return Math.floor(s / 3600) + "h " + Math.floor((s % 3600) / 60) + "m";
+};
+
+let CONFIG = null;
+
+// ---- service table ---------------------------------------------------------
+
+async function refresh() {
+  let data;
+  try {
+    data = await api("api/services");
+  } catch (err) {
+    document.getElementById("rows").innerHTML =
+      `<tr><td colspan="6">${esc(err.message)}</td></tr>`;
+    return;
+  }
+  const health = document.getElementById("health");
+  health.textContent = data.healthy ? "healthy" : "degraded";
+  health.className = "badge " + (data.healthy ? "ok" : "bad");
+
+  document.getElementById("rows").innerHTML = data.services.map(s => {
+    const detail = s.state === "backoff" ? ` retry in ${Math.ceil(s.retry_in)}s` : "";
+    const exit = s.last_exit !== null && s.last_exit !== undefined ? ` last exit ${esc(s.last_exit)}` : "";
+    return `<tr>
+      <td><span class="clamp" title="${esc(s.name)}">${esc(s.name)}</span></td>
+      <td><span class="state ${esc(s.state)} clamp" title="${esc(s.state + detail + exit)}">${esc(s.state)}${esc(detail)}</span></td>
+      <td>${s.running ? esc(fmtUptime(s.uptime)) : "—"}</td>
+      <td>${esc(s.restarts)}</td>
+      <td class="cmd"><span class="clamp" title="${esc(s.command)}">${esc(s.command)}</span></td>
+      <td><div class="acts">
+        <button data-act="start" data-svc="${esc(s.name)}" ${s.running ? "disabled" : ""}>Start</button>
+        <button data-act="stop" data-svc="${esc(s.name)}" ${s.state === "stopped" ? "disabled" : ""}>Stop</button>
+        <button data-act="restart" data-svc="${esc(s.name)}">Restart</button>
+        <button data-act="logs" data-svc="${esc(s.name)}">Logs</button>
+      </div></td>
+    </tr>`;
+  }).join("");
+}
+
+document.getElementById("rows").addEventListener("click", async ev => {
+  const btn = ev.target.closest("button[data-act]");
+  if (!btn) return;
+  const { act, svc } = btn.dataset;
+  if (act === "logs") return showLogs(svc);
+  document.querySelectorAll("#rows button").forEach(b => (b.disabled = true));
+  try {
+    await api(`api/services/${encodeURIComponent(svc)}/${act}`, { method: "POST" });
+  } catch (err) {
+    alert(err.message);
+  }
+  await refresh();
+});
+
+async function showLogs(name) {
+  const dlg = document.getElementById("logDialog");
+  document.getElementById("logTitle").textContent = `${name} — last 200 lines`;
+  document.getElementById("logBody").textContent = "Loading…";
+  dlg.showModal();
+  try {
+    const data = await api(`api/services/${encodeURIComponent(name)}/logs`);
+    const body = document.getElementById("logBody");
+    body.textContent = data.logs.length ? data.logs.join("\n") : "(nothing logged yet)";
+    body.parentElement.scrollTop = body.parentElement.scrollHeight;
+  } catch (err) {
+    document.getElementById("logBody").textContent = err.message;
+  }
+}
+
+// ---- parameters ------------------------------------------------------------
+
+const FIELDS = {
+  pulseaudio: [["extra_args", "Extra arguments", "text"]],
+  snapclient: [["host", "Snapserver host", "text"], ["client_id", "Client ID", "text"],
+               ["alsa_device", "ALSA device", "text"], ["extra_args", "Extra arguments", "text"]],
+  squeezelite: [["name", "Player name", "text"], ["server", "LMS / Music Assistant host:port", "text"],
+                ["mac", "MAC address", "text"], ["output", "PulseAudio sink", "text"],
+                ["extra_args", "Extra arguments", "text"]],
+  ledfx: [["host", "Bind host", "text"], ["port", "Port", "number"],
+          ["extra_args", "Extra arguments", "text"]],
+  snapserver: [["extra_args", "Extra arguments", "text"]],
+};
+
+function renderConfig() {
+  const managed = CONFIG.managed;
+  document.getElementById("cfgBody").innerHTML = managed.map(name => {
+    const conf = CONFIG.services[name] || {};
+    const rows = (FIELDS[name] || []).filter(([key]) => key in conf).map(([key, label, type]) =>
+      `<label>${esc(label)}
+         <input type="${type}" data-svc="${esc(name)}" data-key="${esc(key)}"
+                value="${esc(conf[key])}">
+       </label>`).join("");
+    const enabled = name === "pulseaudio" ? "" :
+      `<label class="inline"><input type="checkbox" data-svc="${esc(name)}" data-key="enabled"
+         ${conf.enabled ? "checked" : ""}> enabled</label>`;
+    return `<fieldset style="border:1px solid var(--line);border-radius:9px;margin:0 0 1rem;padding:.7rem .8rem">
+      <legend style="font-size:.8rem;color:var(--muted)">${esc(name)}</legend>${enabled}${rows}</fieldset>`;
+  }).join("") + `
+    <fieldset style="border:1px solid var(--line);border-radius:9px;margin:0;padding:.7rem .8rem">
+      <legend style="font-size:.8rem;color:var(--muted)">audio</legend>
+      <label>PulseAudio buffer (ms)
+        <input type="number" data-env="PULSE_LATENCY_MSEC" value="${esc(CONFIG.env.PULSE_LATENCY_MSEC)}">
+      </label>
+      <p class="hint">Applies to Squeezelite and LedFx, which let PulseAudio choose their
+      buffer. Saving restarts those two. Snapcast asks for its own and is unaffected.</p>
+      <label>Startup delay after PulseAudio (s)
+        <input type="number" data-env="STARTUP_DELAY_SEC" value="${esc(CONFIG.env.STARTUP_DELAY_SEC)}">
+      </label>
+    </fieldset>`;
+}
+
+function collectPatch() {
+  const patch = { services: {}, env: {} };
+  document.querySelectorAll("#cfgBody [data-svc]").forEach(el => {
+    const { svc, key } = el.dataset;
+    patch.services[svc] = patch.services[svc] || {};
+    patch.services[svc][key] =
+      el.type === "checkbox" ? el.checked : el.type === "number" ? Number(el.value) : el.value;
+  });
+  document.querySelectorAll("#cfgBody [data-env]").forEach(el => {
+    patch.env[el.dataset.env] = el.value;
+  });
+  return patch;
+}
+
+document.getElementById("settingsBtn").addEventListener("click", async () => {
+  await loadConfig();
+  renderConfig();
+  document.getElementById("cfgErr").hidden = true;
+  document.getElementById("cfgDialog").showModal();
+});
+
+document.getElementById("cfgSave").addEventListener("click", async () => {
+  const err = document.getElementById("cfgErr");
+  try {
+    await api("api/config", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(collectPatch()),
+    });
+  } catch (e) {
+    err.textContent = e.message;   // a rejected parameter, reported as itself
+    err.hidden = false;
+    return;
+  }
+  document.getElementById("cfgDialog").close();
+  await loadConfig();
+  await refresh();
+});
+
+document.getElementById("cfgReset").addEventListener("click", async () => {
+  if (!confirm("Discard stored parameters and go back to the container's environment?")) return;
+  await api("api/config/reset", { method: "POST" });
+  await loadConfig();
+  renderConfig();
+  await refresh();
+});
+
+async function loadConfig() {
+  CONFIG = await api("api/config");
+  document.getElementById("role").textContent = CONFIG.role;
+  const link = document.getElementById("ledfxLink");
+  if (CONFIG.ledfx_port) {
+    link.hidden = false;
+    link.onclick = () => window.open(
+      `${location.protocol}//${location.hostname}:${CONFIG.ledfx_port}/`, "_blank");
+  }
+}
+
+document.querySelectorAll("dialog [data-close]").forEach(btn =>
+  btn.addEventListener("click", () => btn.closest("dialog").close()));
+
+document.getElementById("themeBtn").addEventListener("click", () => {
+  const now = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = now;
+  try { localStorage.setItem("panel-theme", now); } catch (e) { /* private mode */ }
+});
+try {
+  const saved = localStorage.getItem("panel-theme");
+  if (saved) document.documentElement.dataset.theme = saved;
+} catch (e) { /* private mode */ }
+
+loadConfig().then(refresh).catch(() => refresh());
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>
