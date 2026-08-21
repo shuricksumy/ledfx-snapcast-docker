@@ -85,6 +85,23 @@ The panel runs inside the supervisor process, so it is the services' own parent 
 lets it signal them. It also serves correctly behind Home Assistant Ingress, calling its API
 relative to the document rather than from `/`.
 
+### Put it in the Home Assistant sidebar
+
+Home Assistant names a sidebar entry from its own config, not from the page — leave `title` out
+and you get the bare URL. In `configuration.yaml`:
+
+```yaml
+panel_iframe:
+  ledfx_panel:
+    title: "LedFx Panel"
+    icon: mdi:led-strip-variant
+    url: "http://192.168.1.50:8080"
+    require_admin: true
+```
+
+Set `ADMIN_PASSWORD` if you do this — an iframe panel is reachable by anyone who can reach the
+port, whatever Home Assistant's own login says.
+
 ### Configure it in the browser, or in compose — your choice
 
 **No environment variables at all is a valid setup.** Start the container, open the panel, fill
