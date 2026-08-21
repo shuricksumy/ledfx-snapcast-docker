@@ -5,3 +5,5 @@
 docker-compose-*.yaml
 build.sh
 tests
+__pycache__
+.pytest_cache
