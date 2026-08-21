@@ -6,6 +6,11 @@
 
 A multi-arch (amd64/arm64) Docker image on Debian 13 (Trixie) that makes your LEDs dance to whatever [**Music Assistant**](https://www.music-assistant.io/) is playing — with no sound card, no `snd-aloop`, and nothing installed on the host.
 
+![The control panel](docs/panel.png)
+
+*Start, stop and restart each process, read its logs and edit its parameters from a browser — no
+container recreate.*
+
 ## ✨ What you get
 
 |  | |
@@ -80,10 +85,17 @@ The panel runs inside the supervisor process, so it is the services' own parent 
 lets it signal them. It also serves correctly behind Home Assistant Ingress, calling its API
 relative to the document rather than from `/`.
 
-It is **not a role**: it runs in all three (`ledfx-suite`, `snapserver`, `snapclient`) and drives
-whatever that role already starts. Existing compose files keep working untouched — the same
-environment variables produce the same command lines as before, and the panel simply goes
-unpublished until you map its port.
+### Configure it in the browser, or in compose — your choice
+
+**No environment variables at all is a valid setup.** Start the container, open the panel, fill
+things in. PulseAudio, LedFx and Squeezelite come up on their defaults (Squeezelite discovers a
+server on the LAN), and Snapclient waits, showing *"set the Snapserver host first"* rather than
+crash-looping against an address nobody gave it. Fill the host in, press Start.
+
+**If you do set environment variables**, they seed `/config/services.json` on first boot. From
+then on **the file is authoritative** — the panel is where you change things, and a stale compose
+file cannot quietly undo an edit. *Reset to env* in the parameters dialog discards the file and
+takes the environment again.
 
 ---
 
@@ -116,31 +128,40 @@ LedFx is then on port `8888` — add your WLED devices there, pick an effect, an
 
 ---
 
-## ✅ Supported Roles
+## ✅ What this image is
 
-* **ledfx-suite**: The "All-in-One" visualizer. Runs PulseAudio, Squeezelite, Snapclient, and LedFx. Audio is routed internally via a virtual Pulse sink.
-* **snapserver**: Runs a standalone Snapserver with support for Named Pipes (FIFOs).
-* **snapclient**: A dedicated hardware player. Runs Snapclient with direct ALSA access for physical DACs (e.g., Topping DX5).
+One thing: **the visualiser**. It runs PulseAudio, Snapclient, Squeezelite and LedFx together, so
+LedFx can hear whatever Music Assistant is playing.
+
+Two roles that used to live here have moved to the projects that do them properly:
+
+| Was | Now |
+| :--- | :--- |
+| `ROLE=snapclient` — a hardware player on ALSA | [**pipewire-snapclient**](https://github.com/shuricksumy/pipewire-snapclient) — native PipeWire, so the DAC follows the source rate |
+| `ROLE=snapserver` — a standalone Snapcast server | [**pipewire-snapclient**](https://github.com/shuricksumy/pipewire-snapclient), or Music Assistant's own built-in Snapserver |
+
+Setting either still starts the container, logs where the job went, and exits — it does not fail
+silently. See also [**pipewire-squeezelite**](https://github.com/shuricksumy/pipewire-squeezelite)
+for Squeezelite on PipeWire at up to 384 kHz and DSD.
 
 ---
 
 ## 🔧 Environment Variables
 
+**All optional** — they seed the panel's config on first boot; the panel owns them afterwards.
+
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| **ROLE** | `ledfx-suite`, `snapserver`, or `snapclient` | `ledfx-suite` |
-| **SNAP_HOST** | IP or Hostname of the Snapserver (TCP URI handled automatically) | `127.0.0.1` |
+| **SNAP_HOST** | IP or hostname of the Snapserver. Unset leaves Snapclient stopped until you set it in the panel | — |
 | **SNAP_CLIENT_ID** | Unique name/ID for the Snapclient instance | `LedFx-Node` |
-| **ALSA_DEVICE** | Physical device name (Used in `snapclient` role) Ex: `plughw:DX5` | `default` |
 | **SNAPCLIENT_LEDFX_ENABLED** | Enable/Disable internal Snapclient in `ledfx-suite` | `true` |
 | **SQUEEZELITE_LEDFX_ENABLED** | Enable/Disable internal Squeezelite in `ledfx-suite` | `true` |
 | **SQUEEZELITE_NAME** | Name of the player as it appears in LMS | `LedFx` |
 | **SQUEEZELITE_MAC** | Fixed MAC address for persistent LMS settings | - |
 | **SQUEEZELITE_SERVER_PORT** | Direct `IP:Port` for LMS (skips discovery) | - |
 | **SQUEEZELITE_OUTPUT** | PulseAudio sink for Squeezelite (`default` = server default sink) | `default` |
-| **FIFO_DIR** | Directory the `snapserver` role creates its named pipes in | `/tmp` |
 | **PULSE_LATENCY_MSEC** | PulseAudio buffer for clients that don't request one (Squeezelite). Also sets how granular the sink monitor LedFx reads is — PulseAudio's own default of 2000 ms leaves Squeezelite seconds behind synced players and updates the effects only ~twice a second. Raise it only if a slow host breaks the audio up | `10` |
-| **EXTRA_ARGS** | Raw flags passed to the primary binary of the role (`snapserver`, `snapclient`, or `ledfx`) | - |
+| **EXTRA_ARGS** | Raw flags appended to LedFx's command line | - |
 
 ---
 
@@ -164,14 +185,14 @@ For the `snapclient` role the image user is in the container's `audio` group (gi
 
 Nothing is vendored in this repo. Every build resolves its dependencies fresh:
 
-* **Snapcast** — `snapclient`/`snapserver` `.deb` packages are downloaded from the [upstream release](https://github.com/badaix/snapcast/releases) during the build and verified against the sha256 digest GitHub publishes for each asset. `--build-arg SNAPCAST_VERSION=v0.35.0` pins a specific release; the default `latest` follows upstream.
+* **Snapcast** — the `snapclient` `.deb` package is downloaded from the [upstream release](https://github.com/badaix/snapcast/releases) during the build and verified against the sha256 digest GitHub publishes for each asset. `--build-arg SNAPCAST_VERSION=v0.35.0` pins a specific release; the default `latest` follows upstream.
 * **LedFx** — installed from PyPI; `--build-arg LEDFX_VERSION=2.0.x` pins it.
 * **Squeezelite** — git submodule; the *Check and Update Submodules* workflow opens a PR when upstream moves.
 * **Debian base** — the image is rebuilt every Monday, and a Trivy scan (fixable CRITICAL/HIGH only) publishes to the repository's Security tab.
 
 ---
 
-## 📡 Case 1: LedFx Suite (The All-in-One Visualizer)
+## 📡 Full example
 
 This role starts a headless PulseAudio server and routes both Squeezelite and Snapclient into it. With no sound card present PulseAudio provides a dummy sink, and LedFx listens to that sink's monitor. **No host kernel modules (snd-aloop) required.**
 
@@ -196,44 +217,4 @@ services:
       - no-new-privileges:true
     volumes:
       - ./ledfx_config:/home/ledfx/.ledfx
-```
-
-## 📦 Case 2: Standalone Snapserver
-Starts Snapserver and creates named pipes (`snapfifo` and `snapfifo_ledfx`) for external audio ingestion. They are created in `FIFO_DIR`, which defaults to `/tmp`; point it at a dedicated mounted directory so the host can write to them.
-
-```YAML
-services:
-  snapserver:
-    image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
-    container_name: snapcast_audio
-    restart: always
-    network_mode: host
-    environment:
-      - ROLE=snapserver
-      - FIFO_DIR=/fifo
-    user: "1000:1000" # chown -R 1000:1000 ${DATA_DIR}/snapserver/config
-    volumes:
-      - ${DATA_DIR}/snapserver/config:/config
-      # Never mount over /tmp itself - the health file and PulseAudio's
-      # runtime dirs live there
-      - ${DATA_DIR}/snapserver/fifo:/fifo
-```
-
-## 🔈 Case 3: Hardware Player (ALSA / Direct DAC)
-Recommended for Audiophile playback. Bypasses software mixers to talk directly to your hardware. Use aplay -L to find your device string.
-
-```YAML
-services:
-  dx5_player:
-    image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
-    container_name: snapclient_dx5
-    restart: unless-stopped
-    user: "1000:1000"
-    devices:
-      - "/dev/snd:/dev/snd"
-    environment:
-      - ROLE=snapclient
-      - SNAP_HOST=192.168.111.111
-      - SNAP_CLIENT_ID=LivingRoom-DX5
-      - ALSA_DEVICE=plughw:DX5
 ```

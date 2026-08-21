@@ -16,6 +16,8 @@ services:
         - "8889:8888" # ledfx web port
         - "8080:8080" # control panel
       environment:
+        # Everything below is optional: with no environment at all, the panel
+        # on :8080 starts with defaults and you configure it there.
         - ROLE=ledfx-suite
         # Panel is open to anyone who can reach the port unless this is set
         # - ADMIN_USER=admin
