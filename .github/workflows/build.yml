@@ -28,7 +28,28 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  # Gates the build: an image that cannot supervise its services is not worth
+  # pushing, and these run in seconds against fake binaries - no audio, no
+  # network, no privileges.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install test dependencies
+        run: pip install --disable-pip-version-check flask pytest
+
+      - name: Run tests
+        run: python -m pytest tests/ -v
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     outputs:
       # This captures the primary tag (e.g., 'latest' or the version) to pass to the scan job

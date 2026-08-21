@@ -4,3 +4,4 @@
 *.md
 docker-compose-*.yaml
 build.sh
+tests
