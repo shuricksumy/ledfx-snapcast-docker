@@ -10,6 +10,7 @@ does the same thing with the same child.
 import os
 import queue
 import subprocess
+import sys
 import threading
 import time
 from collections import deque
@@ -25,8 +26,16 @@ LOG_LINES = 200
 HEALTH_PATH = os.environ.get("HEALTH_PATH", "/tmp/supervisor_health")
 
 
+def _emit(line):
+    """One write per line: print() writes the text and the newline separately,
+    and with the panel, the loop and every child's pump thread all writing to
+    the same stdout, that interleaves them mid-line."""
+    sys.stdout.write(line + "\n")
+    sys.stdout.flush()
+
+
 def log(level, msg):
-    print("[%s] [%s]  ➡️  %s" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), level, msg), flush=True)
+    _emit("[%s] [%s]  ➡️  %s" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), level, msg))
 
 
 class Service:
@@ -141,7 +150,7 @@ class Supervisor:
         try:
             for line in iter(proc.stdout.readline, ""):
                 if line:
-                    print("[%s] %s" % (svc.name, line.rstrip()), flush=True)
+                    _emit("[%s] %s" % (svc.name, line.rstrip()))
                     svc.record(line)
         except Exception:
             pass

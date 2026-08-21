@@ -137,6 +137,11 @@ def serve(sup, doc, snapserver_config=None):
     if not ADMIN_PASSWORD:
         log("WARN", "🔓 ADMIN_PASSWORD is unset - the panel is open to anyone who can reach it")
     log("INFO", "🌐 Panel listening on %s:%s" % (PANEL_HOST, PANEL_PORT))
-    # threaded so a slow stop does not queue the status poll behind it. No
-    # reloader: this is a thread of PID 1, and a reloader would fork.
-    app.run(host=PANEL_HOST, port=PANEL_PORT, threaded=True, use_reloader=False)
+    # make_server rather than app.run: app.run prints Werkzeug's development
+    # server banner and "Press CTRL+C to quit" into the container log, which is
+    # noise at best and alarming at worst next to the audio logs. threaded so a
+    # slow stop does not queue the status poll behind it; no reloader, since
+    # this is a thread of PID 1 and a reloader would fork.
+    from werkzeug.serving import make_server
+
+    make_server(PANEL_HOST, PANEL_PORT, app, threaded=True).serve_forever()
