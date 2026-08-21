@@ -40,6 +40,7 @@
   .state { font-weight: 600; }
   .state.running { color: var(--ok); }
   .state.stopped { color: var(--muted); }
+  .state.blocked { color: var(--warn); }
   .state.backoff, .state.starting { color: var(--warn); }
   button { font: inherit; font-size: .82rem; padding: .3rem .6rem; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; }
   button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
@@ -143,16 +144,17 @@ async function refresh() {
   health.className = "badge " + (data.healthy ? "ok" : "bad");
 
   document.getElementById("rows").innerHTML = data.services.map(s => {
-    const detail = s.state === "backoff" ? ` retry in ${Math.ceil(s.retry_in)}s` : "";
+    const detail = s.blocked ? ` — ${s.blocked}`
+      : s.state === "backoff" ? ` retry in ${Math.ceil(s.retry_in)}s` : "";
     const exit = s.last_exit !== null && s.last_exit !== undefined ? ` last exit ${esc(s.last_exit)}` : "";
     return `<tr>
       <td><span class="clamp" title="${esc(s.name)}">${esc(s.name)}</span></td>
-      <td><span class="state ${esc(s.state)} clamp" title="${esc(s.state + detail + exit)}">${esc(s.state)}${esc(detail)}</span></td>
+      <td><span class="state ${esc(s.blocked ? "blocked" : s.state)} clamp" title="${esc(s.state + detail + exit)}">${esc(s.state)}${esc(detail)}</span></td>
       <td>${s.running ? esc(fmtUptime(s.uptime)) : "—"}</td>
       <td>${esc(s.restarts)}</td>
       <td class="cmd"><span class="clamp" title="${esc(s.command)}">${esc(s.command)}</span></td>
       <td><div class="acts">
-        <button data-act="start" data-svc="${esc(s.name)}" ${s.running ? "disabled" : ""}>Start</button>
+        <button data-act="start" data-svc="${esc(s.name)}" ${s.running || s.blocked ? "disabled" : ""}>Start</button>
         <button data-act="stop" data-svc="${esc(s.name)}" ${s.state === "stopped" ? "disabled" : ""}>Stop</button>
         <button data-act="restart" data-svc="${esc(s.name)}">Restart</button>
         <button data-act="logs" data-svc="${esc(s.name)}">Logs</button>

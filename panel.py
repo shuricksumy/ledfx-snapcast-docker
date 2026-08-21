@@ -26,7 +26,7 @@ PANEL_HOST = os.environ.get("PANEL_HOST", "0.0.0.0")
 INTENT_TIMEOUT = 3.0
 
 
-def create_app(sup, doc, snapserver_config=None):
+def create_app(sup, doc):
     here = os.path.dirname(os.path.abspath(__file__))
     app = Flask(__name__, static_folder=os.path.join(here, "static"), static_url_path="")
     state = {"doc": doc}
@@ -71,10 +71,10 @@ def create_app(sup, doc, snapserver_config=None):
             auth=bool(ADMIN_PASSWORD),
             services=doc["services"],
             env=doc["env"],
-            managed=list(services.ROLE_SERVICES[doc["role"]]),
+            managed=list(services.SERVICES),
             # So the page can link out to LedFx's own UI on its real port
             # rather than assuming 8888.
-            ledfx_port=doc["services"]["ledfx"]["port"] if doc["role"] == "ledfx-suite" else None,
+            ledfx_port=doc["services"]["ledfx"]["port"],
         )
 
     @app.patch("/api/config")
@@ -83,8 +83,7 @@ def create_app(sup, doc, snapserver_config=None):
             new_doc, changed = services.apply_patch(state["doc"], request.get_json(silent=True) or {})
             # Build before saving: an argv that cannot be constructed should be
             # a 400, not a config file that breaks the next boot.
-            specs = services.build(new_doc, fifo_dir=new_doc["env"].get("FIFO_DIR", "/tmp"),
-                                   config_file=snapserver_config)
+            specs = services.build(new_doc)
             services.save(new_doc)
             state["doc"] = new_doc
             if changed:
@@ -95,16 +94,21 @@ def create_app(sup, doc, snapserver_config=None):
     @app.post("/api/config/reset")
     def api_reset_config():
         with lock:
-            doc = services.reset_to_env(role=state["doc"]["role"])
-            specs = services.build(doc, fifo_dir=doc["env"].get("FIFO_DIR", "/tmp"),
-                                   config_file=snapserver_config)
+            doc = services.reset_to_env()
+            specs = services.build(doc)
             state["doc"] = doc
             sup.reconfigure(specs, list(specs)).wait(INTENT_TIMEOUT)
         return jsonify(ok=True, services=doc["services"], env=doc["env"])
 
     @app.get("/api/services")
     def api_services():
-        return jsonify(services=sup.status(), healthy=sup.healthy())
+        # `blocked` says why a service cannot run yet (no Snapserver host, say),
+        # so the page can show a reason instead of an inexplicable "stopped".
+        blocked = {n: s.get("blocked") for n, s in services.build(state["doc"]).items()}
+        rows = sup.status()
+        for row in rows:
+            row["blocked"] = blocked.get(row["name"])
+        return jsonify(services=rows, healthy=sup.healthy())
 
     @app.post("/api/services/<name>/<action>")
     def api_action(name, action):
@@ -113,6 +117,10 @@ def create_app(sup, doc, snapserver_config=None):
         fn = {"start": sup.start, "stop": sup.stop, "restart": sup.restart}.get(action)
         if fn is None:
             return jsonify(error="unknown action %s" % action), 400
+        if action in ("start", "restart"):
+            blocked = services.build(state["doc"])[name].get("blocked")
+            if blocked:
+                return jsonify(error=blocked), 400
         log("INFO", "🖐️ Panel requested %s of %s" % (action, name))
         fn(name).wait(INTENT_TIMEOUT)
         if action in ("start", "stop"):
@@ -143,8 +151,8 @@ def create_app(sup, doc, snapserver_config=None):
     return app
 
 
-def serve(sup, doc, snapserver_config=None):
-    app = create_app(sup, doc, snapserver_config)
+def serve(sup, doc):
+    app = create_app(sup, doc)
     if not ADMIN_PASSWORD:
         log("WARN", "🔓 ADMIN_PASSWORD is unset - the panel is open to anyone who can reach it")
     log("INFO", "🌐 Panel listening on %s:%s" % (PANEL_HOST, PANEL_PORT))

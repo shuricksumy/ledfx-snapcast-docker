@@ -25,13 +25,19 @@ SCHEMA_VERSION = 1
 CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 MAC_RE = re.compile(r"[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}")
 
-# Which services exist for a role, in start order. PulseAudio is first because
-# the clients need it up before they connect, and `autospawn = no` in
-# client.conf means they cannot start one of their own if it is missing.
-ROLE_SERVICES = {
-    "ledfx-suite": ["pulseaudio", "snapclient", "squeezelite", "ledfx"],
-    "snapserver": ["snapserver"],
-    "snapclient": ["snapclient"],
+# The services, in start order. PulseAudio is first because the clients need it
+# up before they connect, and `autospawn = no` in client.conf means they cannot
+# start one of their own if it is missing.
+SERVICES = ["pulseaudio", "snapclient", "squeezelite", "ledfx"]
+ROLE = "ledfx-suite"
+
+# Roles this image used to offer, and where that job now lives. Both duplicated
+# a sibling project that does it better - the ALSA player in particular had no
+# PipeWire, so no bit-perfect rate following - and keeping them here meant
+# shipping a 6MB snapserver plus the whole named-pipe path for nobody.
+RETIRED_ROLES = {
+    "snapserver": "https://github.com/shuricksumy/pipewire-snapclient",
+    "snapclient": "https://github.com/shuricksumy/pipewire-snapclient",
 }
 
 # Clients of the PulseAudio daemon. Restarting it has to take these with it and
@@ -61,19 +67,26 @@ def _env_int(name, fallback):
 
 
 def env_defaults(role=None):
-    """The config document as today's environment variables describe it."""
-    role = (role or os.getenv("ROLE", "ledfx-suite")).lower()
+    """The config document as the environment describes it.
+
+    Every field has a usable default, so the image runs with no environment at
+    all: the panel then shows those defaults and anything that needs a server
+    address stays stopped until you give it one.
+    """
     shared_extra = os.getenv("EXTRA_ARGS", "").strip()
+    snap_host = os.getenv("SNAP_HOST", "").strip()
 
     services = {
         "pulseaudio": {"enabled": True, "extra_args": ""},
         "snapclient": {
-            "enabled": _env_flag("SNAPCLIENT_LEDFX_ENABLED"),
-            "host": os.getenv("SNAP_HOST", "127.0.0.1").strip(),
+            # Without a Snapserver address there is nothing to connect to, so it
+            # starts disabled rather than crash-looping against 127.0.0.1. Fill
+            # the host in from the panel and press Start.
+            "enabled": _env_flag("SNAPCLIENT_LEDFX_ENABLED") and bool(snap_host),
+            "host": snap_host,
             # SNAP_CLIENT_ID with CLIENT_ID as a fallback, as startup.py has
-            # always resolved it - the shipped compose example uses the latter.
+            # always resolved it - the older compose example used the latter.
             "client_id": os.getenv("SNAP_CLIENT_ID", os.getenv("CLIENT_ID", "LedFx-Node")),
-            "alsa_device": os.getenv("ALSA_DEVICE", "default"),
             "extra_args": "",
         },
         "squeezelite": {
@@ -92,29 +105,21 @@ def env_defaults(role=None):
             "port": _env_int("LEDFX_PORT", 8888),
             "extra_args": "",
         },
-        "snapserver": {"enabled": True, "extra_args": ""},
     }
 
-    # EXTRA_ARGS is one shared variable that reaches a different binary per
-    # role. Seed the service it actually applied to, so nobody's flags move.
+    # EXTRA_ARGS reached LedFx in this role, so that is where it still lands.
     if shared_extra:
-        if role == "snapserver":
-            services["snapserver"]["extra_args"] = shared_extra
-        elif role == "snapclient":
-            services["snapclient"]["extra_args"] = shared_extra
-        elif role == "ledfx-suite":
-            services["ledfx"]["extra_args"] = shared_extra
+        services["ledfx"]["extra_args"] = shared_extra
 
     return {
         "version": SCHEMA_VERSION,
-        "role": role,
+        "role": ROLE,
         "services": services,
         "env": {
             # Read by libpulse inside the children, never by us. It is a
             # Dockerfile ENV, so it is normally already in os.environ.
             "PULSE_LATENCY_MSEC": os.getenv("PULSE_LATENCY_MSEC", "10"),
             "STARTUP_DELAY_SEC": str(_env_int("STARTUP_DELAY_SEC", 2)),
-            "FIFO_DIR": os.getenv("FIFO_DIR", "/tmp").rstrip("/") or "/tmp",
         },
     }
 
@@ -172,9 +177,10 @@ _VALIDATORS = {
     "pulseaudio": {"enabled": _bool, "extra_args": _args},
     "snapclient": {
         "enabled": _bool,
-        "host": lambda v, f: _text(v, f, max_len=253),
+        # Blank is allowed: an unconfigured install should be editable in the
+        # panel, not rejected. Starting without one is what gets refused.
+        "host": lambda v, f: _text(v, f, allow_empty=True, max_len=253),
         "client_id": lambda v, f: _text(v, f, max_len=128),
-        "alsa_device": lambda v, f: _text(v, f, max_len=128),
         "extra_args": _args,
     },
     "squeezelite": {
@@ -191,7 +197,6 @@ _VALIDATORS = {
         "port": _port,
         "extra_args": _args,
     },
-    "snapserver": {"enabled": _bool, "extra_args": _args},
 }
 
 
@@ -219,8 +224,6 @@ def _env_value(key, value):
         if not 0 <= secs <= 300:
             raise ConfigError("STARTUP_DELAY_SEC must be between 0 and 300")
         return str(secs)
-    if key == "FIFO_DIR":
-        return _text(value, "FIFO_DIR", max_len=256).rstrip("/") or "/tmp"
     raise ConfigError("unknown setting %s" % key)
 
 
@@ -257,8 +260,8 @@ def apply_patch(doc, patch):
             if key == "PULSE_LATENCY_MSEC":
                 changed.update(PULSE_LATENCY_CONSUMERS)
             else:
-                # STARTUP_DELAY_SEC and FIFO_DIR are read at launch, not by a
-                # running process; they apply to the next start on their own.
+                # STARTUP_DELAY_SEC is read at launch, not by a running
+                # process; it applies to the next start on its own.
                 changed.update(())
 
     return new, sorted(changed)
@@ -322,35 +325,37 @@ def reset_to_env(path=None, role=None):
 # ---- argv -------------------------------------------------------------------
 
 
-def build(doc, fifo_dir=None, config_file=None):
-    """Turn the stored document into {name: {argv, env, enabled}} in start order."""
-    role = doc.get("role", "ledfx-suite")
-    if role not in ROLE_SERVICES:
-        raise ConfigError("unknown role %s" % role)
+def build(doc, **_ignored):
+    """Turn the stored document into {name: {argv, env, enabled}} in start order.
 
+    A service whose required parameter is missing comes back disabled with a
+    `blocked` reason, so the panel can say why rather than launching something
+    that cannot work.
+    """
     svc = doc["services"]
     env = doc.get("env", {})
-    fifo_dir = fifo_dir or env.get("FIFO_DIR", "/tmp")
     # libpulse reads this from the child's environment; snapclient sets its own
     # buffer and is unaffected either way.
     child_env = {"PULSE_LATENCY_MSEC": str(env.get("PULSE_LATENCY_MSEC", "10"))}
 
     specs = OrderedDict()
-    for name in ROLE_SERVICES[role]:
+    for name in SERVICES:
         conf = svc[name]
+        blocked = None
+
         if name == "pulseaudio":
             argv = ["pulseaudio", "--exit-idle-time=-1", "--disallow-exit", "--log-target=stderr"]
         elif name == "snapclient":
-            host = conf["host"]
-            host_uri = host if "://" in host else "tcp://%s" % host
-            if role == "ledfx-suite":
-                argv = ["snapclient", "--player", "pulse", "--soundcard", "default",
-                        "--hostID", conf["client_id"]]
+            host = conf.get("host", "").strip()
+            argv = ["snapclient", "--player", "pulse", "--soundcard", "default",
+                    "--hostID", conf["client_id"]]
+            argv += shlex.split(conf.get("extra_args", ""))
+            if host:
+                argv.append(host if "://" in host else "tcp://%s" % host)
             else:
-                argv = ["snapclient", "--player", "alsa", "--soundcard", conf["alsa_device"],
-                        "--hostID", conf["client_id"]]
-            argv += shlex.split(conf.get("extra_args", "")) + [host_uri]
+                blocked = "set the Snapserver host first"
         elif name == "squeezelite":
+            # No server is a valid setup: squeezelite discovers one on the LAN.
             argv = ["squeezelite", "-o", conf["output"], "-n", conf["name"]]
             if conf.get("server"):
                 argv += ["-s", conf["server"]]
@@ -360,11 +365,13 @@ def build(doc, fifo_dir=None, config_file=None):
         elif name == "ledfx":
             argv = ["/ledfx/venv/bin/ledfx", "--host", conf["host"], "--port", str(conf["port"])]
             argv += shlex.split(conf.get("extra_args", ""))
-        elif name == "snapserver":
-            argv = ["snapserver", "-c", config_file or "/etc/snapserver.conf"]
-            argv += shlex.split(conf.get("extra_args", ""))
-        else:  # pragma: no cover - ROLE_SERVICES is the only source of names
+        else:  # pragma: no cover - SERVICES is the only source of names
             continue
 
-        specs[name] = {"argv": argv, "env": dict(child_env), "enabled": bool(conf.get("enabled", True))}
+        specs[name] = {
+            "argv": argv,
+            "env": dict(child_env),
+            "enabled": bool(conf.get("enabled", True)) and blocked is None,
+            "blocked": blocked,
+        }
     return specs

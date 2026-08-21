@@ -20,18 +20,6 @@ from supervisor import Supervisor, log
 _shutdown = threading.Event()
 
 
-def show_config(file_path):
-    try:
-        if os.path.exists(file_path):
-            log("INFO", "📄 Content of %s:" % file_path)
-            print("-" * 40, flush=True)
-            content = Path(file_path).read_text()
-            print(content if content.strip() else "[Empty File]", flush=True)
-            print("-" * 40, flush=True)
-    except Exception:
-        pass
-
-
 def cleanup():
     log("INFO", "🧹 Performing pre-start cleanup...")
     for path_str in ["/tmp/.esd-*", "/tmp/pulse-*", supervisor.HEALTH_PATH]:
@@ -47,33 +35,6 @@ def cleanup():
             pass
 
 
-def setup_fifos(fifo_dir):
-    for pipe_name in ["snapfifo", "snapfifo_ledfx"]:
-        path = "%s/%s" % (fifo_dir, pipe_name)
-        try:
-            if not os.path.exists(path):
-                log("INFO", "📂 Creating Named Pipe at %s" % path)
-                os.mkfifo(path)
-            os.chmod(path, 0o666)
-        except Exception as exc:
-            log("ERROR", "❌ Failed to setup FIFO %s: %s" % (path, exc))
-
-
-def snapserver_config(fifo_dir):
-    """The config snapserver should read, retargeted if FIFO_DIR moved."""
-    config_file = "/config/snapserver.conf" if os.path.exists("/config/snapserver.conf") else "/etc/snapserver.conf"
-    if fifo_dir != "/tmp" and config_file == "/etc/snapserver.conf":
-        # The shipped config hardcodes /tmp, so retarget it rather than making
-        # FIFO_DIR require a hand-written snapserver.conf
-        rendered = "/tmp/snapserver.conf"
-        Path(rendered).write_text(
-            Path(config_file).read_text().replace("/tmp/snapfifo", "%s/snapfifo" % fifo_dir)
-        )
-        config_file = rendered
-    show_config(config_file)
-    return config_file
-
-
 def handle_signal(signum, _frame):
     log("INFO", "📴 Caught %s, shutting down..." % signal.Signals(signum).name)
     _shutdown.set()
@@ -86,23 +47,18 @@ def main():
 
         cleanup()
 
-        doc = services.load()
-        role = doc["role"]
-        if role not in services.ROLE_SERVICES:
-            log("ERROR", "Unknown Role: %s" % role)
+        role = os.getenv("ROLE", services.ROLE).lower()
+        if role in services.RETIRED_ROLES:
+            # Tell them where the job went rather than dying with "unknown".
+            log("ERROR", "ROLE=%s is no longer part of this image - it duplicated "
+                         "a project that does it better. Use %s"
+                % (role, services.RETIRED_ROLES[role]))
             sys.exit(1)
 
-        log("INFO", "🛠️ System initialized for Role: %s" % role.upper())
+        doc = services.load()
+        log("INFO", "🌈 Mode: LedFx Suite (Pulse Bridge)")
 
-        fifo_dir = doc["env"].get("FIFO_DIR", "/tmp")
-        config_file = None
-        if role == "snapserver":
-            setup_fifos(fifo_dir)
-            config_file = snapserver_config(fifo_dir)
-        elif role == "ledfx-suite":
-            log("INFO", "🌈 Mode: LedFx Suite (Pulse Bridge)")
-
-        specs = services.build(doc, fifo_dir=fifo_dir, config_file=config_file)
+        specs = services.build(doc)
         sup = Supervisor(
             specs,
             startup_delay=int(doc["env"].get("STARTUP_DELAY_SEC", 2)),
@@ -115,7 +71,7 @@ def main():
             try:
                 import panel
                 threading.Thread(
-                    target=panel.serve, args=(sup, doc, config_file), daemon=True, name="panel"
+                    target=panel.serve, args=(sup, doc), daemon=True, name="panel"
                 ).start()
             except Exception as exc:
                 log("ERROR", "🌐 Panel failed to start (%s); services continue" % exc)

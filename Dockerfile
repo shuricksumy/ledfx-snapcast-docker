@@ -26,8 +26,7 @@ RUN set -eu; \
     tag="$(jq -r .tag_name /tmp/release.json)"; \
     echo "==> Snapcast release ${tag} (${TARGETARCH}/${SNAPCAST_SUITE})"; \
     mkdir -p /debs; \
-    for spec in "snapclient:snapclient_.*_${TARGETARCH}_${SNAPCAST_SUITE}_with-pulse[.]deb" \
-                "snapserver:snapserver_.*_${TARGETARCH}_${SNAPCAST_SUITE}[.]deb"; do \
+    for spec in "snapclient:snapclient_.*_${TARGETARCH}_${SNAPCAST_SUITE}_with-pulse[.]deb"; do \
         name="${spec%%:*}"; pattern="${spec#*:}"; \
         asset="$(jq -c --arg p "^${pattern}$" '[.assets[] | select(.name | test($p))] | first' /tmp/release.json)"; \
         [ "$asset" != "null" ] || { echo "ERROR: ${tag} has no asset matching ${pattern}" >&2; exit 1; }; \
@@ -115,9 +114,9 @@ RUN echo "cache epoch: ${REFRESH_WEEK}" && apt-get update && apt-get upgrade -y 
     python3 python3-flask ca-certificates \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY --from=snapcast /debs/snapclient.deb /debs/snapserver.deb /tmp/
+COPY --from=snapcast /debs/snapclient.deb /tmp/
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends /tmp/snapclient.deb /tmp/snapserver.deb \
+    && apt-get install -y --no-install-recommends /tmp/snapclient.deb \
     && rm -f /tmp/*.deb && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /ledfx/venv /ledfx/venv
@@ -165,7 +164,6 @@ ENV PYTHONUNBUFFERED=1
 ENV PULSE_LATENCY_MSEC=10
 
 WORKDIR /
-COPY snapserver.conf /etc/snapserver.conf
 COPY startup.py services.py supervisor.py panel.py /
 COPY static/ /static/
 

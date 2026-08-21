@@ -125,11 +125,38 @@ def test_extra_args_are_split_like_a_shell_but_never_run_through_one(env):
     assert argv[-4:] == ["-a", "80:4::", "-r", "44100"]
 
 
-def test_each_role_builds_only_its_own_services(env):
-    assert list(services.build(services.env_defaults("snapserver"))) == ["snapserver"]
-    assert list(services.build(services.env_defaults("snapclient"))) == ["snapclient"]
-    argv = services.build(services.env_defaults("snapclient"))["snapclient"]["argv"]
-    assert "alsa" in argv          # the hardware role, not the pulse one
+def test_there_is_one_service_set(env):
+    assert list(services.build(services.env_defaults())) == [
+        "pulseaudio", "snapclient", "squeezelite", "ledfx"]
+
+
+def test_retired_roles_point_at_where_the_job_went(env):
+    # ROLE=snapserver used to work here; it should not fail silently or
+    # cryptically now that it does not.
+    assert "pipewire-snapclient" in services.RETIRED_ROLES["snapserver"]
+    assert "pipewire-snapclient" in services.RETIRED_ROLES["snapclient"]
+
+
+def test_with_no_environment_at_all_the_image_still_has_a_config(monkeypatch):
+    for var in ["ROLE", "SNAP_HOST", "SNAP_CLIENT_ID", "CLIENT_ID", "EXTRA_ARGS",
+                "SQUEEZELITE_NAME", "SQUEEZELITE_SERVER_PORT", "SQUEEZELITE_MAC",
+                "SQUEEZELITE_EXTRA_ARGS", "SQUEEZELITE_OUTPUT", "PULSE_LATENCY_MSEC",
+                "STARTUP_DELAY_SEC", "LEDFX_HOST", "LEDFX_PORT"]:
+        monkeypatch.delenv(var, raising=False)
+    specs = services.build(services.env_defaults())
+
+    # PulseAudio, LedFx and Squeezelite (which discovers a server) can all run
+    # unconfigured; snapclient has nothing to connect to and says so.
+    assert specs["pulseaudio"]["enabled"] and specs["ledfx"]["enabled"]
+    assert specs["squeezelite"]["enabled"]
+    assert not specs["snapclient"]["enabled"]
+    assert specs["snapclient"]["blocked"] == "set the Snapserver host first"
+
+
+def test_giving_a_host_unblocks_snapclient(env):
+    doc = services.env_defaults()
+    assert services.build(doc)["snapclient"]["blocked"] is None
+    assert services.build(doc)["snapclient"]["argv"][-1] == "tcp://192.168.1.50"
 
 
 def test_pulse_latency_reaches_the_children(env):
@@ -148,6 +175,7 @@ def test_pulse_latency_reaches_the_children(env):
     ({"services": {"ledfx": {"port": 0}}}, "between 1 and 65535"),
     ({"services": {"ledfx": {"port": "eight"}}}, "must be a number"),
     ({"services": {"snapclient": {"host": "with\x00null"}}}, "control characters"),
+    ({"services": {"snapclient": {"client_id": ""}}}, "cannot be empty"),
     ({"services": {"nosuch": {"x": 1}}}, "unknown service"),
     ({"services": {"ledfx": {"nosuch": 1}}}, "unknown parameter"),
     ({"env": {"PULSE_LATENCY_MSEC": "0"}}, "between 1 and 10000"),
