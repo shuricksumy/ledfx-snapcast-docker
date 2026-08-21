@@ -17,7 +17,7 @@ container recreate.*
 | :-- | :-- |
 | 💡 **The room becomes the party** | Strips and matrices react to whatever is playing anywhere in the house. |
 | 🚫 **No `snd-aloop`, no sound card** | Everything happens inside the container. The host is not modified at all. |
-| 🎛️ **Three roles, one image** | All-in-one visualiser, a standalone Snapserver, or a hardware ALSA player. |
+| 🎛️ **A panel, not a redeploy** | Start, stop and restart each process, read its logs and change its settings in a browser. |
 | 🔌 **Both transports** | A Squeezelite player and a Snapcast client can feed it, together or separately. |
 
 **Running more than one room?** The [Home Audio Stack](https://github.com/shuricksumy/home-audio-stack) has a [complete compose file](https://github.com/shuricksumy/home-audio-stack/tree/main/examples) with this image alongside the others.
@@ -170,14 +170,14 @@ for Squeezelite on PipeWire at up to 384 kHz and DSD.
 The container **runs as UID/GID 1000**, not root. Two things follow from that:
 
 * Bind-mounted directories must be writable by that UID — `chown -R 1000:1000 <dir>` on the host, or override with `user: "<uid>:<gid>"` in compose.
-* The LedFx config now lives at **`/home/ledfx/.ledfx`**, not `/root/.ledfx`. If you are upgrading, move the mount and chown the host directory:
+* The LedFx config lives at **`/home/ledfx/.ledfx`**, not `/root/.ledfx`. Upgrading from before v1.0.0 means moving that mount and chowning the directory:
 
 ```bash
-sudo chown -R 1000:1000 ./ledfx_config
-# volumes: - ./ledfx_config:/home/ledfx/.ledfx
+sudo chown -R 1000:1000 ./data/ledfx
+# volumes: - ./data/ledfx:/home/ledfx/.ledfx
 ```
 
-For the `snapclient` role the image user is in the container's `audio` group (gid 29). If `/dev/snd` on your host is owned by a different gid, add it with `group_add`.
+That applies to both mounts: `/home/ledfx/.ledfx` for LedFx's own state and `/config` for the panel's parameters. No sound card is passed in, so there is no `/dev/snd` or `audio` group to think about — the container's audio never leaves it.
 
 ---
 
