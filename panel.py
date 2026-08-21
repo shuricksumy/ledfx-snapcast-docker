@@ -115,6 +115,17 @@ def create_app(sup, doc, snapserver_config=None):
             return jsonify(error="unknown action %s" % action), 400
         log("INFO", "🖐️ Panel requested %s of %s" % (action, name))
         fn(name).wait(INTENT_TIMEOUT)
+        if action in ("start", "stop"):
+            # Write the decision through to the stored config, so there is one
+            # source of truth. Otherwise a later edit to any service would see
+            # enabled=true against a service the operator stopped and helpfully
+            # start it again - and a stopped service would come back on the
+            # next container restart.
+            with lock:
+                doc = state["doc"]
+                if name in doc["services"]:
+                    doc["services"][name]["enabled"] = (action == "start")
+                    services.save(doc)
         return jsonify(ok=True, service=sup.services[name].status())
 
     @app.get("/api/services/<name>/logs")

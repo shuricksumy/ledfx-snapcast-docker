@@ -223,6 +223,12 @@ class Supervisor:
                 continue
             svc.argv = list(spec["argv"])
             svc.env = dict(spec.get("env") or {})
+            # Only act on enabled for a service the caller says changed. Acting
+            # on every disagreement would let an edit to one service revive
+            # another that the operator had stopped from the panel, since a
+            # runtime stop and a stored enabled=true legitimately differ.
+            if name not in changed:
+                continue
             wanted = bool(spec.get("enabled", True))
             if wanted != svc.desired:
                 (self._do_start if wanted else self._do_stop)(name)

@@ -153,3 +153,17 @@ def test_auth_gates_everything_when_a_password_is_set(sup, monkeypatch):
         assert c.get("/api/services", headers={"Authorization": "Basic " + token}).status_code == 200
         bad = base64.b64encode(b"admin:wrong").decode()
         assert c.get("/api/services", headers={"Authorization": "Basic " + bad}).status_code == 401
+
+
+def test_stopping_through_the_api_persists_and_is_not_undone_by_an_edit(client):
+    assert wait_until(lambda: all(client.sup.services[n].running for n in client.sup.order))
+    client.post("/api/services/squeezelite/stop")
+
+    # The stop is recorded in the config, not just in memory
+    assert client.get("/api/config").get_json()["services"]["squeezelite"]["enabled"] is False
+
+    # ...so an unrelated edit cannot resurrect it
+    client.patch("/api/config", json={"services": {"ledfx": {"port": 9002}}})
+    assert wait_until(lambda: client.sup.services["ledfx"].proc is not None)
+    time.sleep(0.5)
+    assert client.sup.services["squeezelite"].state == "stopped"

@@ -171,3 +171,19 @@ def test_stop_all_leaves_nothing_behind(sup):
     sup.stop_all()
 
     assert not any(pid_alive(pid) for pid in pids)
+
+
+def test_editing_one_service_does_not_revive_another_that_was_stopped(sup):
+    """A stop from the panel and a stored enabled=true legitimately differ, so
+    reconfigure must not treat that disagreement as something to correct."""
+    assert wait_until(lambda: all_running(sup))
+    sup.stop("squeezelite").wait(5)
+
+    # An unrelated edit: squeezelite is in the specs (everything always is) and
+    # still carries enabled=True from the stored config.
+    specs = {n: fake_spec(n) for n in sup.order}
+    sup.reconfigure(specs, ["ledfx"]).wait(10)
+
+    assert wait_until(lambda: sup.services["ledfx"].running)
+    assert sup.services["squeezelite"].state == "stopped"
+    assert sup.services["squeezelite"].proc is None
