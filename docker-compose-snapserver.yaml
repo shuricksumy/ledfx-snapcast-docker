@@ -8,13 +8,16 @@ services:
     network_mode: host
     # chown -R 1000:1000 ${DATA_DIR}/snapserver/config once after upgrading
     user: "1000:1000"
+    # network_mode: host publishes the panel on 8080 along with everything else
     security_opt:
       - no-new-privileges:true
     environment:
       - ROLE=snapserver
+      # The panel is on :8080 in every role. PANEL_ENABLED=false turns it off.
       - FIFO_DIR=/fifo # Where snapfifo/snapfifo_ledfx are created
       - EXTRA_ARGS=-v # Enable verbose logging for the server
     volumes:
+      # Holds snapserver.conf and now the panel's services.json
       - ${DATA_DIR}/snapserver/config:/config
       - /etc/localtime:/etc/localtime:ro
       # Pipes live in FIFO_DIR. Do not mount over /tmp itself - the health file

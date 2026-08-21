@@ -80,6 +80,11 @@ The panel runs inside the supervisor process, so it is the services' own parent 
 lets it signal them. It also serves correctly behind Home Assistant Ingress, calling its API
 relative to the document rather than from `/`.
 
+It is **not a role**: it runs in all three (`ledfx-suite`, `snapserver`, `snapclient`) and drives
+whatever that role already starts. Existing compose files keep working untouched — the same
+environment variables produce the same command lines as before, and the panel simply goes
+unpublished until you map its port.
+
 ---
 
 ## 🎛️ Use it with Music Assistant
