@@ -14,8 +14,12 @@ services:
             ipv4_address: $IP_LEDFX # You can specify a static IP
       ports:
         - "8889:8888" # ledfx web port
+        - "8080:8080" # control panel
       environment:
         - ROLE=ledfx-suite
+        # Panel is open to anyone who can reach the port unless this is set
+        # - ADMIN_USER=admin
+        # - ADMIN_PASSWORD=change-me
         # --- Snapclient Config ---
         - SNAP_HOST=192.168.111.111
         - CLIENT_ID=LedFx
@@ -31,3 +35,8 @@ services:
       volumes:
         # chown -R 1000:1000 $DATA_DIR/ledfx once after upgrading
         - $DATA_DIR/ledfx:/home/ledfx/.ledfx
+        # Parameters edited in the panel live here. Without this mount they are
+        # lost on recreate and the environment above seeds them again.
+        # chown -R 1000:1000 $DATA_DIR/ledfx-config first, or the container
+        # cannot write it - it runs as uid 1000.
+        - $DATA_DIR/ledfx-config:/config

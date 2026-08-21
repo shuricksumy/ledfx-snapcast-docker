@@ -112,7 +112,7 @@ RUN echo "cache epoch: ${REFRESH_WEEK}" && apt-get update && apt-get upgrade -y 
     pulseaudio pulseaudio-utils libasound2-plugins alsa-utils \
     libflac14 libvorbisfile3 libmad0 libfaad2 libmpg123-0 libopusfile0 \
     libsoxr0 libssl3 libasound2 libportaudio2 libsamplerate0 \
-    python3 ca-certificates \
+    python3 python3-flask ca-certificates \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=snapcast /debs/snapclient.deb /debs/snapserver.deb /tmp/
@@ -166,7 +166,8 @@ ENV PULSE_LATENCY_MSEC=10
 
 WORKDIR /
 COPY snapserver.conf /etc/snapserver.conf
-COPY startup.py /startup.py
+COPY startup.py services.py supervisor.py panel.py /
+COPY static/ /static/
 
 # Run unprivileged. UID/GID 1000 is the default because it matches the first
 # desktop/service user on most hosts, which is what owns the bind-mounted
@@ -188,4 +189,11 @@ USER 1000:1000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD find /tmp/supervisor_health -mmin -1 | grep -q . || exit 1
 
-ENTRYPOINT ["python3", "-u", "/startup.py"]
+EXPOSE 8080
+# The panel's port. LedFx keeps 8888 to itself.
+ENV PANEL_PORT=8080
+
+# /usr/bin/python3 explicitly, NOT `python3`: PATH puts the LedFx venv first,
+# and that interpreter has no access to the apt-installed Flask in
+# /usr/lib/python3/dist-packages, so the panel would fail to import at boot.
+ENTRYPOINT ["/usr/bin/python3", "-u", "/startup.py"]

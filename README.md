@@ -47,6 +47,41 @@ flowchart LR
     style IMG stroke-width:3px
 ```
 
+## 🖥️ Control panel
+
+Every supervised process — PulseAudio, Snapclient, Squeezelite, LedFx — can be started,
+stopped and restarted from a browser on **port 8080**, with its last 200 log lines and its
+parameters editable in place. Changing a parameter restarts only the service it belongs to;
+nothing here requires recreating the container.
+
+```yaml
+ports:
+  - "8080:8080"     # panel
+  - "8889:8888"     # LedFx's own UI
+volumes:
+  - ./data/ledfx-config:/config    # chown -R 1000:1000 this first
+environment:
+  - ADMIN_USER=admin               # optional; without ADMIN_PASSWORD the
+  - ADMIN_PASSWORD=change-me       # panel is open to anyone who can reach it
+```
+
+The environment variables in your compose file **seed** `/config/services.json` on first
+boot. After that the file wins, so a value you change in the panel is not reverted by a stale
+compose file on the next restart — *Reset to env* in the parameters dialog goes back the other
+way. Without the `/config` mount the file is written inside the container and lost on recreate.
+
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| **PANEL_PORT** | Port the panel listens on | `8080` |
+| **PANEL_ENABLED** | Set `false` to run headless, exactly as before the panel existed | `true` |
+| **ADMIN_USER** / **ADMIN_PASSWORD** | Basic auth. No password = no auth | — |
+
+The panel runs inside the supervisor process, so it is the services' own parent — that is what
+lets it signal them. It also serves correctly behind Home Assistant Ingress, calling its API
+relative to the document rather than from `/`.
+
+---
+
 ## 🎛️ Use it with Music Assistant
 
 Add the container as a player, group it with your real speakers, and the LEDs follow the house. Both routes work at the same time — pick per source, or run both and disable one.
