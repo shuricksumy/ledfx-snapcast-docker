@@ -14,7 +14,7 @@ on:
       - '.github/**'
       - '*.md'
       # Not part of the image - editing them should not republish it
-      - 'docker-compose-*.yaml'
+      - 'docker-compose*.yaml'
       - 'build.sh'
   release:
     types: [published]

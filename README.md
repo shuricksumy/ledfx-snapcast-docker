@@ -194,7 +194,9 @@ Nothing is vendored in this repo. Every build resolves its dependencies fresh:
 
 ## 📡 Full example
 
-This role starts a headless PulseAudio server and routes both Squeezelite and Snapclient into it. With no sound card present PulseAudio provides a dummy sink, and LedFx listens to that sink's monitor. **No host kernel modules (snd-aloop) required.**
+The container starts a headless PulseAudio, routes Squeezelite and Snapclient into it, and lets
+LedFx listen to that sink's monitor. With no sound card present PulseAudio provides a dummy sink.
+**No host kernel modules (`snd-aloop`) required.**
 
 ```yaml
 services:
@@ -202,19 +204,30 @@ services:
     image: ghcr.io/shuricksumy/ledfx-snapcast-docker:latest
     container_name: ledfx_visualizer
     restart: always
-    network_mode: host
+    network_mode: host          # panel on :8080, LedFx on :8888
     environment:
-      - ROLE=ledfx-suite
+      # All optional - the panel can set every one of these. They seed
+      # /config/services.json on first boot, and the file wins afterwards.
       - SNAP_HOST=192.168.111.111
       - SQUEEZELITE_NAME=LedFx-Vibe
       - SQUEEZELITE_SERVER_PORT=192.168.111.111:3483
       - SQUEEZELITE_MAC=72:23:90:63:08:66
-      # Disable Squeezelite, keep Snapclient active
-      - SQUEEZELITE_LEDFX_ENABLED=true
-      - SNAPCLIENT_LEDFX_ENABLED=true
+      # - ADMIN_USER=admin        # without ADMIN_PASSWORD the panel is open
+      # - ADMIN_PASSWORD=change-me
     user: "1000:1000"
     security_opt:
       - no-new-privileges:true
     volumes:
-      - ./ledfx_config:/home/ledfx/.ledfx
+      # LedFx's own state: effects, devices, scenes
+      - ./data/ledfx:/home/ledfx/.ledfx
+      # Parameters edited in the panel. Without this they are lost on recreate
+      # and the environment above seeds them again.
+      - ./data/ledfx-config:/config
+```
+
+Both directories must be writable by uid 1000, or the container cannot save anything:
+
+```bash
+mkdir -p data/ledfx data/ledfx-config && sudo chown -R 1000:1000 data
+docker compose up -d
 ```
