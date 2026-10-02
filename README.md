@@ -141,6 +141,8 @@ environment:
 
 LedFx is then on port `8888` — add your WLED devices there, pick an effect, and press play in Music Assistant.
 
+> **Reaching LedFx by a domain name** (say `ledfx.example.com` behind a reverse proxy): since LedFx 2.2.0 it answers 403 to any host name it does not recognise. IP addresses, bare host names and `.local` / `.lan` / `.home.arpa` names work as before; anything else must be added to `allowed_hosts` in LedFx's `config.json` (under `/home/ledfx/.ledfx`), e.g. `"allowed_hosts": ["ledfx.example.com"]`.
+
 > **If the LEDs run slightly ahead of the speakers**, that is the container's ~10 ms audio path beating a real DAC's output latency. Trim it with the per-player sync offset in Music Assistant or LMS. `PULSE_LATENCY_MSEC` controls the other direction — see [Environment Variables](#-environment-variables).
 
 ---
@@ -203,7 +205,7 @@ That applies to both mounts: `/home/ledfx/.ledfx` for LedFx's own state and `/co
 Nothing is vendored in this repo. Every build resolves its dependencies fresh:
 
 * **Snapcast** — the `snapclient` `.deb` package is downloaded from the [upstream release](https://github.com/badaix/snapcast/releases) during the build and verified against the sha256 digest GitHub publishes for each asset. `--build-arg SNAPCAST_VERSION=v0.35.0` pins a specific release; the default `latest` follows upstream.
-* **LedFx** — installed from PyPI; `--build-arg LEDFX_VERSION=2.0.x` pins it.
+* **LedFx** — installed from PyPI; `--build-arg LEDFX_VERSION=2.2.0` pins it.
 * **Squeezelite** — git submodule; the *Check and Update Submodules* workflow opens a PR when upstream moves.
 * **Debian base** — the image is rebuilt every Monday, and a Trivy scan (fixable CRITICAL/HIGH only) publishes to the repository's Security tab.
 
