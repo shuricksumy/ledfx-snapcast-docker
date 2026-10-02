@@ -134,6 +134,10 @@ jobs:
             REFRESH_WEEK=${{ steps.inputs.outputs.refresh_week }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Published builds (weekly, release, manual) start from scratch, so a
+          # stale layer can never reach a release; ordinary pushes and PRs keep
+          # the cache for speed. cache-to still refreshes it either way.
+          no-cache: ${{ github.event_name != 'push' && github.event_name != 'pull_request' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
