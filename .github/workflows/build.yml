@@ -83,7 +83,9 @@ jobs:
       # Snapcast .deb packages are pulled from the upstream release at build
       # time. Resolving the tag here (authenticated) keeps the in-build API
       # call off the anonymous rate limit and makes the version visible in the
-      # build log. REFRESH_WEEK changes every ISO week so the scheduled
+      # build log. LedFx is resolved the same way: pinning the build arg to the
+      # current PyPI release busts the pip layer the day LedFx ships, rather
+      # than on the next ISO week. REFRESH_WEEK changes every ISO week so the scheduled
       # rebuild re-runs apt/pip instead of restoring a stale cache.
       - name: Resolve build inputs
         id: inputs
@@ -92,10 +94,12 @@ jobs:
         run: |
           set -euo pipefail
           snapcast="$(gh api repos/badaix/snapcast/releases/latest --jq .tag_name)"
+          ledfx="$(curl -fsSL --retry 3 https://pypi.org/pypi/ledfx/json | jq -r .info.version)"
           week="$(date -u +%G-W%V)"
           echo "snapcast_version=$snapcast" >> "$GITHUB_OUTPUT"
+          echo "ledfx_version=$ledfx" >> "$GITHUB_OUTPUT"
           echo "refresh_week=$week" >> "$GITHUB_OUTPUT"
-          echo "Snapcast $snapcast | cache epoch $week"
+          echo "Snapcast $snapcast | LedFx $ledfx | cache epoch $week"
 
       - name: Extract Docker metadata
         id: meta
@@ -126,6 +130,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           build-args: |
             SNAPCAST_VERSION=${{ steps.inputs.outputs.snapcast_version }}
+            LEDFX_VERSION=${{ steps.inputs.outputs.ledfx_version }}
             REFRESH_WEEK=${{ steps.inputs.outputs.refresh_week }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
