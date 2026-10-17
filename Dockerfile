@@ -1,7 +1,7 @@
 # --- Stage 0: Fetch Snapcast packages from the upstream GitHub release ---
 # Runs on the build host (not under QEMU) - it only downloads, and picks the
 # package for $TARGETARCH explicitly.
-FROM --platform=$BUILDPLATFORM debian:trixie-slim AS snapcast
+FROM --platform=$BUILDPLATFORM debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f AS snapcast
 
 ARG TARGETARCH
 # Release to install. "latest" resolves the newest published release at build
@@ -40,7 +40,7 @@ RUN set -eu; \
 
 
 # --- Stage 1: Build (LedFx venv + Squeezelite) ---
-FROM debian:trixie AS builder
+FROM debian:trixie@sha256:913f6706df59a68922d1dd08f78c2476560a8d367897200a6005b00e5f67c2d5 AS builder
 
 # Changing this busts the apt/pip cache so a scheduled rebuild actually picks
 # up new Debian security updates and a new LedFx release (CI sets it to the
@@ -97,7 +97,7 @@ RUN BUILD_OPTS="$(./squeezelite -? 2>&1 | grep '^Build options:')" && \
 
 
 # --- Stage 2: Runtime ---
-FROM debian:trixie-slim
+FROM debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
 
 ARG REFRESH_WEEK=0
 
