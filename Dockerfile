@@ -40,7 +40,7 @@ RUN set -eu; \
 
 
 # --- Stage 1: Build (LedFx venv + Squeezelite) ---
-FROM debian:trixie@sha256:913f6706df59a68922d1dd08f78c2476560a8d367897200a6005b00e5f67c2d5 AS builder
+FROM debian:trixie@sha256:4c25275446ca371766b8b093c696782eabce06263fccacb8d5d813b3dc44b308 AS builder
 
 # Changing this busts the apt/pip cache so a scheduled rebuild actually picks
 # up new Debian security updates and a new LedFx release (CI sets it to the
