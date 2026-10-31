@@ -16,6 +16,11 @@ on:
       # Not part of the image - editing them should not republish it
       - 'docker-compose*.yaml'
       - 'build.sh'
+  # Renovate and Dependabot merge their own PRs once test and build pass
+  # (required by the main-branch ruleset), so PRs run them too.
+  pull_request:
+    branches:
+      - main
   release:
     types: [published]
   # Rebuild weekly so Debian security updates, a new LedFx release and a new
@@ -68,6 +73,9 @@ jobs:
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Login to GitHub Container Registry
+        # Skipped on pull requests: a PR only needs to prove the image still
+        # builds, and Dependabot PRs get no secrets to log in with.
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
         with:
           registry: ghcr.io
@@ -75,6 +83,7 @@ jobs:
           password: ${{ secrets.GHCR_PAT }}
 
       - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
@@ -125,7 +134,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           provenance: false
           platforms: linux/amd64,linux/arm64
           build-args: |
@@ -148,6 +157,7 @@ jobs:
     # upstream release, the pip-installed ledfx package), not just source, since that's where
     # this repo's actual dependency surface lives. Public image, so no login needed to pull.
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
