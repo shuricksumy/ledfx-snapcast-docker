@@ -1,7 +1,7 @@
 # --- Stage 0: Fetch Snapcast packages from the upstream GitHub release ---
 # Runs on the build host (not under QEMU) - it only downloads, and picks the
 # package for $TARGETARCH explicitly.
-FROM --platform=$BUILDPLATFORM debian:trixie-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4 AS snapcast
+FROM --platform=$BUILDPLATFORM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2 AS snapcast
 
 ARG TARGETARCH
 # Release to install. "latest" resolves the newest published release at build
@@ -97,7 +97,7 @@ RUN BUILD_OPTS="$(./squeezelite -? 2>&1 | grep '^Build options:')" && \
 
 
 # --- Stage 2: Runtime ---
-FROM debian:trixie-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4
+FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
 
 ARG REFRESH_WEEK=0
 
